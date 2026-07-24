@@ -53,3 +53,4 @@ s2026-07-24 10 [WAKE→N1] independent roadmap and backlog reviews — nightmare
 s2026-07-24 11 [N1→WAKE] secondary revision — corrected five weighted scores and ties; added concrete formulas, recipient loops, novelty hooks, touch proofs; replaced the linear game chain with real blockers and split large productions into complete graybox + release slices
 s2026-07-24 12 [WAKE→N3] replay: 15 score rows recompute exactly; ticket graph 77 unique IDs / 0 missing blockers / 0 cycles; both independent audits clean enough to commit; npm test 105/105 green
 s2026-07-24 13 [N3] consolidation: GAME_ROADMAP.md + tickets.md ready; seeded shift promoted from nightstand into P-009 Daily Shift; ledger empty; nightmare credited for the winning hostile-review correction
+s2026-07-24 14 [N3→WAKE→N3] release: committed 615c6b1 and pushed main; Pages built that exact commit; production index, GAME_ROADMAP.html, and tickets.html returned 200 with the new compendium content
