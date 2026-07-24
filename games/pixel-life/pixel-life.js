@@ -2,6 +2,7 @@
 // AGE UP button, and an obituary card at the end. Engine in ./logic.js.
 
 import { newLife, ageUp, obituary, lifeScore, STATS } from './logic.js';
+import { createTextPainter } from '../../shell/canvas-text.js';
 
 const W = 640;
 const H = 480;
@@ -63,17 +64,7 @@ export function createPixelLife() {
       ctx.fillStyle = pal.ink;
       ctx.fillRect(0, 0, W, H);
 
-      const text = (str, x, y, { size = 13, color = pal.cream, bold = false, glow = 0, align = 'left' } = {}) => {
-        ctx.font = `${bold ? 'bold ' : ''}${size}px "Courier New", monospace`;
-        ctx.fillStyle = color;
-        ctx.textAlign = align;
-        if (glow) {
-          ctx.shadowColor = color;
-          ctx.shadowBlur = glow;
-        }
-        ctx.fillText(str, x, y);
-        ctx.shadowBlur = 0;
-      };
+      const text = createTextPainter(ctx, pal, { size: 13, align: 'left' });
 
       if (!state.alive) {
         // obituary card

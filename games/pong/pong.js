@@ -3,6 +3,7 @@
 // touch), and drawing.
 
 import { CFG, newGame, step, movePaddle, movePaddleTo, cpuDir } from './logic.js';
+import { createTextPainter } from '../../shell/canvas-text.js';
 
 const CPU_SPEED = 0.82; // fraction of a human paddle's speed
 
@@ -123,17 +124,7 @@ export function createPong() {
       ctx.fillStyle = pal.ink;
       ctx.fillRect(0, 0, CFG.W, CFG.H);
 
-      const text = (str, x, y, { size = 16, color = pal.cream, bold = false, glow = 0, align = 'center' } = {}) => {
-        ctx.font = `${bold ? 'bold ' : ''}${size}px "Courier New", monospace`;
-        ctx.fillStyle = color;
-        ctx.textAlign = align;
-        if (glow) {
-          ctx.shadowColor = color;
-          ctx.shadowBlur = glow;
-        }
-        ctx.fillText(str, x, y);
-        ctx.shadowBlur = 0;
-      };
+      const text = createTextPainter(ctx, pal, { size: 16 });
 
       if (mode === null) {
         text('PONG', CFG.W / 2, 150, { size: 52, color: pal.amber, bold: true, glow: 16 });

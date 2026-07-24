@@ -7,7 +7,21 @@ import { palette } from './palette.js';
 import { createInput } from './input.js';
 import { createCrt } from './crt.js';
 import { createSfx } from './sfx.js';
+import { createTextPainter } from './canvas-text.js';
+import { disposeScreen } from './screen.js';
 import { advance, STEP_MS } from './loop.js';
+import { activateCartridge } from './cartridge.js';
+import {
+  cardsForPage,
+  catalogPageControlAt,
+  CATALOG_PAGER,
+  firstIndexForPage,
+  hitTestPage,
+  moveCatalogSelection,
+  pageCount,
+  pageForIndex,
+  shiftCatalogPage,
+} from './catalog-layout.js';
 import {
   loadScores,
   saveScores,
@@ -74,26 +88,16 @@ function fitCanvas() {
 window.addEventListener('resize', fitCanvas);
 fitCanvas();
 
-function text(
-  str,
-  x,
-  y,
-  { size = 16, color = palette.cream, align = 'center', bold = false, glow = 0 } = {},
-) {
-  ctx2d.font = `${bold ? 'bold ' : ''}${size}px "Courier New", monospace`;
-  ctx2d.fillStyle = color;
-  ctx2d.textAlign = align;
-  if (glow > 0) {
-    ctx2d.shadowColor = color;
-    ctx2d.shadowBlur = glow;
-  }
-  ctx2d.fillText(str, x, y);
-  ctx2d.shadowBlur = 0;
-}
+const text = createTextPainter(ctx2d, palette, { size: 16 });
 
 function clear() {
   ctx2d.fillStyle = palette.ink;
   ctx2d.fillRect(0, 0, W, H);
+}
+
+function compactLabel(value, max = 36) {
+  const label = String(value);
+  return label.length <= max ? label : `${label.slice(0, max - 1).trimEnd()}…`;
 }
 
 // --- Screens -------------------------------------------------------------
@@ -165,7 +169,7 @@ function attractScreen() {
         bold: true,
         glow: pulse,
       });
-      text('five games · open all night', W / 2, H / 2 - 4, {
+      text(`${cartridges.length} games · open all night`, W / 2, H / 2 - 4, {
         size: 13,
         color: palette.rose,
       });
@@ -183,16 +187,13 @@ function attractScreen() {
 
 function selectScreen() {
   let index = 0;
-  const top = 90;
-  const rowH = 68;
-  const rowRect = (i) => ({ x: 60, y: top + i * rowH, w: W - 120, h: rowH - 10 });
 
   return {
     update() {
-      if (input.pressed('up', 'down')) {
+      const direction = ['up', 'down', 'left', 'right'].find((name) => input.pressed(name));
+      if (direction) {
         sfx.play('move');
-        if (input.pressed('up')) index = (index + cartridges.length - 1) % cartridges.length;
-        else index = (index + 1) % cartridges.length;
+        index = moveCatalogSelection(index, direction, cartridges.length);
       }
       if (input.pressed('pause')) {
         sfx.play('pause');
@@ -203,69 +204,104 @@ function selectScreen() {
         return gameScreen(cartridges[index]);
       }
       if (input.pointer.justDown) {
-        for (let i = 0; i < cartridges.length; i += 1) {
-          const r = rowRect(i);
-          const p = input.pointer;
-          if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) {
-            sfx.play('start');
-            return gameScreen(cartridges[i]);
-          }
+        const currentPage = pageForIndex(index, cartridges.length);
+        const pageControl = catalogPageControlAt(
+          cartridges.length,
+          input.pointer.x,
+          input.pointer.y,
+        );
+        if (pageControl) {
+          const nextPage = shiftCatalogPage(
+            currentPage,
+            pageControl === 'next' ? 1 : -1,
+            cartridges.length,
+          );
+          index = firstIndexForPage(nextPage, cartridges.length);
+          sfx.play('move');
+          return;
+        }
+        const hit = hitTestPage(
+          cartridges.length,
+          currentPage,
+          input.pointer.x,
+          input.pointer.y,
+        );
+        if (hit >= 0) {
+          sfx.play('start');
+          return gameScreen(cartridges[hit]);
         }
       }
     },
     draw() {
       clear();
-      text('SELECT GAME', W / 2, 48, { size: 24, color: palette.amber, bold: true, glow: 10 });
+      text('SELECT A SHIFT', 44, 42, {
+        size: 22, color: palette.amber, bold: true, glow: 10, align: 'left',
+      });
+      const currentPage = pageForIndex(index, cartridges.length);
+      const pages = pageCount(cartridges.length);
+      text(pages > 1 ? `${cartridges.length} CARTS · ${currentPage + 1}/${pages}` : `${cartridges.length} CARTRIDGES · PAGE 1/1`, pages > 1 ? 476 : W - 44, 40, {
+        size: 11, color: palette.rose, align: 'right',
+      });
+      if (pages > 1) {
+        for (const [name, rect] of Object.entries(CATALOG_PAGER)) {
+          ctx2d.strokeStyle = palette.hairline;
+          ctx2d.strokeRect(rect.x, rect.y, rect.w, rect.h);
+          text(name === 'previous' ? '‹' : '›', rect.x + rect.w / 2, rect.y + 30, {
+            size: 22, color: palette.amber,
+          });
+        }
+      }
       ctx2d.strokeStyle = palette.hairline;
       ctx2d.beginPath();
-      ctx2d.moveTo(60, 62);
-      ctx2d.lineTo(W - 60, 62);
+      ctx2d.moveTo(44, 54);
+      ctx2d.lineTo(W - 44, 54);
       ctx2d.stroke();
 
-      cartridges.forEach((cart, i) => {
-        const r = rowRect(i);
-        const selected = i === index;
+      for (const r of cardsForPage(cartridges.length, currentPage)) {
+        const cart = cartridges[r.index];
+        const selected = r.index === index;
+        const accent = palette[cart.details.accent] ?? palette.amber;
         ctx2d.beginPath();
         ctx2d.roundRect(r.x, r.y, r.w, r.h, 8);
         if (selected) {
-          ctx2d.fillStyle = 'rgba(230,193,126,0.07)';
+          ctx2d.fillStyle = 'rgba(230,193,126,0.08)';
           ctx2d.fill();
-          ctx2d.shadowColor = palette.amber;
+          ctx2d.shadowColor = accent;
           ctx2d.shadowBlur = 10;
         }
-        ctx2d.strokeStyle = selected ? palette.amber : palette.hairline;
+        ctx2d.strokeStyle = selected ? accent : palette.hairline;
         ctx2d.stroke();
         ctx2d.shadowBlur = 0;
 
-        if (selected) {
-          text('▶', r.x - 24, r.y + 30, { size: 14, color: palette.amber, glow: 8 });
-        }
-        text(cart.title, r.x + 18, r.y + 26, {
+        text(cart.title, r.x + 14, r.y + 22, {
           align: 'left',
           color: selected ? palette.cream : palette.periwinkle,
-          size: 18,
+          size: 16,
           bold: selected,
         });
-        text(cart.blurb, r.x + 18, r.y + 46, {
+        text(`HI ${topScore(loadScores(cart.id))}`, r.x + r.w - 14, r.y + 21, {
+          align: 'right', size: 11, color: accent,
+        });
+        text(`${cart.details.genre} · ${cart.details.players}P`, r.x + 14, r.y + 41, {
+          align: 'left', size: 10, color: accent, bold: true,
+        });
+        text(compactLabel(cart.blurb), r.x + 14, r.y + 61, {
           align: 'left',
-          size: 12,
+          size: 10,
           color: palette.rose,
         });
-        text(`HI ${topScore(loadScores(cart.id))}`, r.x + r.w - 18, r.y + 26, {
-          align: 'right',
-          size: 14,
-          color: palette.deep,
-        });
-      });
-      text('arrows + SPACE, or tap a game', W / 2, H - 24, {
-        size: 12,
-        color: palette.rose,
+      }
+      const selected = cartridges[index];
+      text(`${selected.details.controls.join(' + ')} · SPACE / TAP TO LOAD`, W / 2, H - 18, {
+        size: 11, color: palette.rose,
       });
     },
   };
 }
 
-function gameScreen(cart) {
+function gameScreen(entry) {
+  let cart = null;
+  let disposed = false;
   let paused = false;
   let finished = null; // { score } once the cartridge calls endGame
   let sincefinish = 0;
@@ -277,7 +313,7 @@ function gameScreen(cart) {
     height: H,
     palette,
     sfx,
-    highScore: topScore(loadScores(cart.id)),
+    highScore: topScore(loadScores(entry.id)),
     shake(power = 5) {
       shakeMag = power;
       shakeT = 0.25;
@@ -285,17 +321,22 @@ function gameScreen(cart) {
     endGame(score) {
       finished = { score: Math.max(0, Math.round(score)) };
       sincefinish = 0;
-      sfx.play(qualifies(loadScores(cart.id), finished.score) ? 'fanfare' : 'lose');
+      sfx.play(qualifies(loadScores(entry.id), finished.score) ? 'fanfare' : 'lose');
     },
   };
 
-  cart.init(gameCtx);
+  cart = activateCartridge(entry, gameCtx);
   showEject(true);
   consumeEject();
 
-  const eject = () => {
-    cart.destroy();
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    cart?.destroy();
     showEject(false);
+  };
+  const eject = () => {
+    dispose();
     sfx.play('pause');
     return selectScreen();
   };
@@ -304,7 +345,7 @@ function gameScreen(cart) {
     if (cart.restart) cart.restart();
     else {
       cart.destroy();
-      cart.init(gameCtx);
+      cart = activateCartridge(entry, gameCtx);
     }
     paused = false;
     finished = null;
@@ -320,11 +361,10 @@ function gameScreen(cart) {
         sincefinish += dt;
         if (sincefinish < 0.5) return; // debounce the killing blow's input
         if (input.pressed('restart')) return restart();
-        if (qualifies(loadScores(cart.id), finished.score)) {
+        if (qualifies(loadScores(entry.id), finished.score)) {
           if (input.pressed('action') || input.pointer.justDown) {
-            cart.destroy();
-            showEject(false);
-            return initialsScreen(cart, finished.score);
+            dispose();
+            return initialsScreen(entry, finished.score);
           }
         } else if (input.pressed('action') || input.pointer.justDown) {
           restart();
@@ -364,12 +404,13 @@ function gameScreen(cart) {
         ctx2d.fillRect(0, 0, W, H);
         text('GAME OVER', W / 2, H / 2 - 30, { size: 28, color: palette.rose });
         text(`SCORE ${finished.score}`, W / 2, H / 2 + 4, { color: palette.cream });
-        const hint = qualifies(loadScores(cart.id), finished.score)
+        const hint = qualifies(loadScores(entry.id), finished.score)
           ? 'NEW HIGH SCORE — tap for initials · R to retry'
           : 'tap or R to restart · Q to eject';
         text(hint, W / 2, H / 2 + 36, { size: 14, color: palette.amber });
       }
     },
+    destroy: dispose,
   };
 }
 
@@ -476,7 +517,11 @@ function frame(now) {
     for (let i = 0; i < r.steps; i += 1) {
       if (input.pressed('m') && !sfx.toggleMute()) sfx.play('click');
       const next = screen.update(STEP_MS / 1000);
-      if (next) screen = next;
+      if (next) {
+        disposeScreen(screen, (error) => console.error('screen cleanup fault:', error));
+        input.rebase?.();
+        screen = next;
+      }
       // edges are one-step-sized: a keypress must not fall through into the
       // next step's screen (attract → select → game on one SPACE)
       input.endFrame();
@@ -484,6 +529,7 @@ function frame(now) {
     screen.draw();
     crt.draw(ctx2d, W, H, now);
   } catch (err) {
+    disposeScreen(screen, (error) => console.error('screen cleanup fault:', error));
     console.error('cabinet fault:', err);
     screen = faultScreen(err);
   }

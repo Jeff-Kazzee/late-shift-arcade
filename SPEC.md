@@ -1,6 +1,6 @@
 # Late Shift Arcade — spec
 
-One static website, five retro games, one cabinet shell. CRT feel, night
+One static website, eight retro games, one cabinet shell. CRT feel, night
 palette. No dependencies, no build step. Keep it simple.
 
 ## The shell (build first)
@@ -11,6 +11,11 @@ palette. No dependencies, no build step. Keep it simple.
   `{ id, title, blurb, init(ctx), update(dt, input), draw(ctx2d), destroy() }`.
   The shell owns the canvas, fixed-timestep loop, input, and scores. Games
   own nothing global.
+- `games/registry.js` wraps cartridge factories in immutable catalog entries
+  with genre, controls, player count, accent, and tags. Every launch creates a
+  fresh validated instance; a failed `init` is cleaned up transactionally.
+- The cabinet selector is a touch-sized 2×4 grid with paging, so adding a game
+  is a registry entry rather than a shell layout rewrite.
 - Shared modules:
   - `shell/input.js` — keyboard (arrows/WASD/space) + mouse + touch.
   - `shell/scores.js` — per-game high scores in localStorage, 3-letter
@@ -59,13 +64,32 @@ in the air max. Three enemy tiers (bee, butterfly, armored boss) scoring
 more when hit mid-dive. 3 lives with respawn invulnerability; waves escalate
 in size and dive frequency.
 
+### 6. NEON SNAKE
+
+Grid survival with swipe/arrow turns, timed food chains, escalating speed,
+and short-lived bonus pickups. The run waits for the player's first direction
+before the clock starts. Touch: swipe anywhere on the playfield.
+
+### 7. LUNAR DESCENT
+
+Precision lander physics across shifting moon terrain. Rotate, manage finite
+fuel, read the velocity/tilt envelope, and settle on progressively narrower
+pads. Touch: three held zones for rotate left, thrust, and rotate right.
+
+### 8. MIDNIGHT RUN
+
+Top-down endless traffic racer. Thread four lanes, build near-miss combos,
+collect boost pickups, and survive rising speed and spawn pressure across
+three lives. The run waits for the player's first steering input. Touch: drag
+the car horizontally.
+
 > Note: the original slot-5 game, PIXEL LIFE (BitLife-style sim, 60+ event
 > table in `games/pixel-life/events.js`), is built, tested, and kept in the
 > tree — swapped out of the cabinet for GALAXY RAID on 2026-07-23.
 
 ## Done means
 
-- Shell + five games playable with keyboard/mouse AND touch on a phone.
+- Shell + eight games playable with keyboard/mouse AND touch on a phone.
 - `npm test` green: pure-logic tests per game (paddle/ball math, puck
   physics step, blast-chain resolution, life-event engine draws and stat
   gating).

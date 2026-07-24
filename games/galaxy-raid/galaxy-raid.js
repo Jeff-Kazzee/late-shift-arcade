@@ -2,6 +2,7 @@
 // starfield, chunky sprites, input mapping, and pyrotechnics.
 
 import { CFG, TYPES, newGame, step, fire, movePlayer, movePlayerTo } from './logic.js';
+import { createTextPainter } from '../../shell/canvas-text.js';
 
 const SPRITE_COLOR = { bee: 'amber', butterfly: 'periwinkle', boss: 'rose' };
 
@@ -93,17 +94,7 @@ export function createGalaxyRaid() {
       ctx.fillStyle = pal.ink;
       ctx.fillRect(0, 0, CFG.W, CFG.H);
 
-      const text = (str, x, y, { size = 14, color = pal.cream, bold = false, glow = 0, align = 'center' } = {}) => {
-        ctx.font = `${bold ? 'bold ' : ''}${size}px "Courier New", monospace`;
-        ctx.fillStyle = color;
-        ctx.textAlign = align;
-        if (glow) {
-          ctx.shadowColor = color;
-          ctx.shadowBlur = glow;
-        }
-        ctx.fillText(str, x, y);
-        ctx.shadowBlur = 0;
-      };
+      const text = createTextPainter(ctx, pal);
 
       // starfield
       for (const s of stars) {

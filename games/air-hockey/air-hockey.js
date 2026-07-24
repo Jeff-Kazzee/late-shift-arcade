@@ -3,6 +3,7 @@
 // and paints the table.
 
 import { CFG, newGame, step, setMallet, cpuTarget } from './logic.js';
+import { createTextPainter } from '../../shell/canvas-text.js';
 
 const WINS_KEY = 'late-shift-arcade:air-hockey:wins';
 
@@ -107,17 +108,7 @@ export function createAirHockey() {
       ctx.fillStyle = pal.ink;
       ctx.fillRect(0, 0, CFG.W, CFG.H);
 
-      const text = (str, x, y, { size = 16, color = pal.cream, bold = false, glow = 0, align = 'center' } = {}) => {
-        ctx.font = `${bold ? 'bold ' : ''}${size}px "Courier New", monospace`;
-        ctx.fillStyle = color;
-        ctx.textAlign = align;
-        if (glow) {
-          ctx.shadowColor = color;
-          ctx.shadowBlur = glow;
-        }
-        ctx.fillText(str, x, y);
-        ctx.shadowBlur = 0;
-      };
+      const text = createTextPainter(ctx, pal, { size: 16 });
 
       // table markings
       ctx.strokeStyle = pal.hairline;

@@ -24,6 +24,10 @@ export function createInput(canvas) {
   const held = new Set();
   const edges = new Set();
   const active = new Map(); // pointerId → {x, y} for every finger down
+  // A screen transition must not hand the gesture that triggered it to the
+  // next screen. Keep those pointer ids long enough to consume their lift,
+  // while exposing only pointers that began after the transition.
+  const quarantined = new Set();
   // `moved` flips true on the first real pointer motion — games use it to
   // steer by hover on desktop without demanding a held button.
   const pointer = { x: 0, y: 0, down: false, justDown: false, justUp: false, moved: false };
@@ -44,6 +48,7 @@ export function createInput(canvas) {
   };
   const onKeyUp = (e) => held.delete(norm(e.key));
   const onPointerDown = (e) => {
+    if (quarantined.has(e.pointerId)) return;
     canvas.setPointerCapture?.(e.pointerId);
     const p = toCanvas(e);
     active.set(e.pointerId, p);
@@ -54,6 +59,7 @@ export function createInput(canvas) {
     pointer.moved = true;
   };
   const onPointerMove = (e) => {
+    if (quarantined.has(e.pointerId)) return;
     const p = toCanvas(e);
     if (active.has(e.pointerId)) active.set(e.pointerId, p);
     pointer.x = p.x;
@@ -61,11 +67,16 @@ export function createInput(canvas) {
     pointer.moved = true;
   };
   const onPointerUp = (e) => {
+    if (quarantined.has(e.pointerId)) {
+      active.delete(e.pointerId);
+      quarantined.delete(e.pointerId);
+      return;
+    }
     const p = toCanvas(e);
     active.delete(e.pointerId);
     pointer.x = p.x;
     pointer.y = p.y;
-    pointer.down = active.size > 0;
+    pointer.down = Array.from(active.keys()).some((id) => !quarantined.has(id));
     pointer.justUp = true;
   };
 
@@ -79,7 +90,7 @@ export function createInput(canvas) {
   return {
     pointer,
     // Every finger currently down, in canvas coordinates.
-    touches: () => Array.from(active.values()),
+    touches: () => Array.from(active).filter(([id]) => !quarantined.has(id)).map(([, p]) => p),
     // Semantic names ('up', 'action') or raw keys ('w', 'space') both work —
     // 2-player games read raw keys so W/S and the arrows stay distinct.
     down: (...names) => names.some((n) => expand(n).some((k) => held.has(k))),
@@ -88,6 +99,17 @@ export function createInput(canvas) {
       edges.clear();
       pointer.justDown = false;
       pointer.justUp = false;
+    },
+    // Fence the gesture that changed screens. Keyboard holds intentionally
+    // survive: holding a movement key across a transition is still a live
+    // keyboard action, unlike a tap that selected a cartridge.
+    rebase() {
+      for (const id of active.keys()) quarantined.add(id);
+      edges.clear();
+      pointer.down = false;
+      pointer.justDown = false;
+      pointer.justUp = false;
+      pointer.moved = false;
     },
     detach() {
       window.removeEventListener('keydown', onKeyDown);

@@ -7,7 +7,7 @@ current. The session is not done until N3 runs.
 
 ## What this is
 
-A retro arcade website: five games in one CRT-styled cabinet shell. See
+A retro arcade website: eight games in one CRT-styled cabinet shell. See
 `SPEC.md`. That's it — a website with games. Do not add lore, mascots,
 frameworks, or build tooling.
 

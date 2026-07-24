@@ -5,6 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cartridges } from '../games/registry.js';
+import { activateCartridge } from '../shell/cartridge.js';
 import { palette } from '../shell/palette.js';
 
 // A 2D-context stand-in where every property is callable and chainable.
@@ -29,9 +30,9 @@ const inputStub = {
   pointer: { x: 0, y: 0, down: false, justDown: false, justUp: false, moved: false },
 };
 
-test('every cartridge survives init → update ×3 → draw → destroy on stubs', () => {
-  assert.equal(cartridges.length, 5);
-  for (const cart of cartridges) {
+test('every catalog entry survives fresh launch → update ×3 → draw → destroy on stubs', () => {
+  assert.equal(cartridges.length, 8);
+  for (const entry of cartridges) {
     const gameCtx = {
       width: 640,
       height: 480,
@@ -41,7 +42,7 @@ test('every cartridge survives init → update ×3 → draw → destroy on stubs
       shake() {},
       sfx: { play() {} },
     };
-    cart.init(gameCtx);
+    const cart = activateCartridge(entry, gameCtx);
     for (let i = 0; i < 3; i += 1) cart.update(1 / 60, inputStub);
     cart.draw(makeStubCtx());
     cart.destroy();

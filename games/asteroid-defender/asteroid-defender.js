@@ -2,6 +2,7 @@
 // there. Rules in ./logic.js; this is input, skyline, and pyrotechnics.
 
 import { CFG, newGame, step, fire, blockX } from './logic.js';
+import { createTextPainter } from '../../shell/canvas-text.js';
 
 export function createAsteroidDefender() {
   let shell = null;
@@ -57,17 +58,7 @@ export function createAsteroidDefender() {
       ctx.fillStyle = sky;
       ctx.fillRect(0, 0, CFG.W, CFG.H);
 
-      const text = (str, x, y, { size = 14, color = pal.cream, bold = false, glow = 0, align = 'center' } = {}) => {
-        ctx.font = `${bold ? 'bold ' : ''}${size}px "Courier New", monospace`;
-        ctx.fillStyle = color;
-        ctx.textAlign = align;
-        if (glow) {
-          ctx.shadowColor = color;
-          ctx.shadowBlur = glow;
-        }
-        ctx.fillText(str, x, y);
-        ctx.shadowBlur = 0;
-      };
+      const text = createTextPainter(ctx, pal);
 
       // HUD
       text(`SCORE ${state.score}`, 22, 34, { align: 'left', bold: true });
