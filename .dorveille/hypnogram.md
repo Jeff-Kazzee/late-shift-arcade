@@ -24,3 +24,4 @@ s2026-07-23 18 [REM→WAKE] all 10 findings fixed + sfx/trails/particles/shake; 
 s2026-07-23 19 [WAKE] user redirect: game 5 becomes a Galaga-style shooter — block 7: GALAXY RAID; pixel-life keeps its module+tests but leaves the cabinet registry
 s2026-07-23 20 [WAKE→N3] block 7 done: GALAXY RAID 65/65 first-run green, verified local + live; pushed; Pages rebuilt and verified (user already posted 9200 on asteroid defender on the live site)
 s2026-07-23 21 [N3] session close: replay 65/65, deploy live at jeff-kazzee.github.io/late-shift-arcade, nightstand re-triaged (pixel-life re-rack / galaga stretch / difficulty select parked), ledger empty, memory updated; SPEC "Done means" fully met
+s2026-07-23 22 [N3→WAKE→N3] user bug report: air-hockey puck pinned in corner — root cause: mallet push-out could shove the puck out of bounds, wall clamp + friction ate every escape; fixed with in-table clamp + wall-adjacent stall nudge, 3 regression tests, 68/68, pushed live
