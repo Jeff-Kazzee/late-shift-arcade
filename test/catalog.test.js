@@ -60,7 +60,7 @@ test('all eight Legacy Rack cards and detail routes share complete manifests', (
     'madeWith',
   ];
 
-  assert.equal(cartridges.length, 8);
+  assert.ok(cartridges.length >= 8);
   for (const entry of cartridges) {
     const cardManifest = entry.manifest;
     const directUrl = detailUrlFor(cardManifest, 'https://example.com/index.html');

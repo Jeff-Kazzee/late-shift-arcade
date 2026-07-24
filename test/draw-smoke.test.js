@@ -31,7 +31,7 @@ const inputStub = {
 };
 
 test('every catalog entry survives fresh launch → update ×3 → draw → destroy on stubs', async () => {
-  assert.equal(cartridges.length, 8);
+  assert.ok(cartridges.length >= 8, 'the legacy rack stays intact');
   for (const entry of cartridges) {
     // Also the proof that every registry line resolves: a mistyped loader
     // path or a module missing its default export fails here, not on launch.

@@ -19,6 +19,7 @@ import { manifest as galaxyRaid } from './galaxy-raid/manifest.js';
 import { manifest as neonSnake } from './neon-snake/manifest.js';
 import { manifest as lunarDescent } from './lunar-descent/manifest.js';
 import { manifest as midnightRun } from './midnight-run/manifest.js';
+import { manifest as railSwitch } from './rail-switch/manifest.js';
 
 // Pixel Life's module and tests live on in games/pixel-life; it left the
 // rack when GALAXY RAID took slot five (2026-07-23). An unlisted folder is
@@ -35,4 +36,5 @@ export const cartridges = validateCatalog([
   defineCatalogEntry(neonSnake, lazyModule('./neon-snake/neon-snake.js', import.meta.url)),
   defineCatalogEntry(lunarDescent, lazyModule('./lunar-descent/lunar-descent.js', import.meta.url)),
   defineCatalogEntry(midnightRun, lazyModule('./midnight-run/midnight-run.js', import.meta.url)),
+  defineCatalogEntry(railSwitch, lazyModule('./rail-switch/rail-switch.js', import.meta.url)),
 ]);
