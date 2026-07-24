@@ -208,3 +208,6 @@ export function createBreakout() {
     },
   };
 }
+
+// The default export is the cartridge factory: how the rack loads a game.
+export default createBreakout;

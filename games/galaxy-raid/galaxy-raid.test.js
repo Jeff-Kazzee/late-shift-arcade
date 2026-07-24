@@ -10,7 +10,7 @@ import {
   fire,
   movePlayer,
   movePlayerTo,
-} from '../games/galaxy-raid/logic.js';
+} from './logic.js';
 
 const rng = () => 0.99; // never rolls a dive-fire, picks last formation enemy
 

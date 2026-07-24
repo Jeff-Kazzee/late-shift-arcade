@@ -30,9 +30,12 @@ const inputStub = {
   pointer: { x: 0, y: 0, down: false, justDown: false, justUp: false, moved: false },
 };
 
-test('every catalog entry survives fresh launch → update ×3 → draw → destroy on stubs', () => {
+test('every catalog entry survives fresh launch → update ×3 → draw → destroy on stubs', async () => {
   assert.equal(cartridges.length, 8);
   for (const entry of cartridges) {
+    // Also the proof that every registry line resolves: a mistyped loader
+    // path or a module missing its default export fails here, not on launch.
+    const loaded = await entry.load();
     const gameCtx = {
       width: 640,
       height: 480,
@@ -42,7 +45,7 @@ test('every catalog entry survives fresh launch → update ×3 → draw → dest
       shake() {},
       sfx: { play() {} },
     };
-    const cart = activateCartridge(entry, gameCtx);
+    const cart = activateCartridge(loaded, gameCtx);
     for (let i = 0; i < 3; i += 1) cart.update(1 / 60, inputStub);
     cart.draw(makeStubCtx());
     cart.destroy();

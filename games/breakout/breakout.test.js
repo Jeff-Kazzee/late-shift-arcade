@@ -10,7 +10,7 @@ import {
   launch,
   brickX,
   brickY,
-} from '../games/breakout/logic.js';
+} from './logic.js';
 
 const noPower = () => 0.99; // rng above POWER_CHANCE: plain bricks
 const allWide = () => 0; // rng of 0: every brick drops 'wide'

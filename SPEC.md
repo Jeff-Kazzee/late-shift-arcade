@@ -48,11 +48,12 @@ does not duplicate its checklist.
   `{ id, title, blurb, init(ctx), update(dt, input), draw(ctx2d), destroy() }`.
   The shell owns the canvas, fixed-timestep loop, input, and scores. Games
   own nothing global.
-- `games/registry.js` pairs each cartridge factory with one deeply frozen
-  schema-version-1 catalog manifest — see "The catalog manifest" below. Every
-  launch creates a fresh validated instance; a failed `init` is cleaned up
-  transactionally. Only validated, `published`, `first-party-2d` entries can
-  launch; every other runtime and status fails closed before the factory runs.
+- `games/registry.js` pairs each game's deeply frozen schema-version-1 catalog
+  manifest — see "The catalog manifest" below — with a lazy loader for its
+  code. Every launch creates a fresh validated instance; a failed `init` is
+  cleaned up transactionally. Only validated, `published`, `first-party-2d`
+  entries can launch; every other runtime and status fails closed *before the
+  module is fetched*, because evaluating a module is executing it.
 - Every game is addressable at `?game=<slug>&version=<version>`, which opens
   its detail screen. Query parameters keep the site deployable from any static
   file server with no rewrite rules. Browser Back/Forward reconciles the route
@@ -115,6 +116,31 @@ Two rules are enforced rather than merely documented:
 
 Schema changes are versioned. Raising `schemaVersion` is a migration ticket,
 not an edit.
+
+## The game package
+
+A game is a folder, and a folder is the whole game:
+
+```
+games/pong/
+  manifest.js   <- the catalog manifest. Data only; imports no game code
+  pong.js       <- the cartridge factory, as the module's default export
+  logic.js      <- pure rules
+  pong.test.js  <- tests live with the game
+```
+
+`games/registry.js` names the installed folders and nothing else: one line
+pairing a statically imported manifest with `lazyModule('./pong/pong.js',
+import.meta.url)`. Adding a game is dropping the folder in and adding that
+line; removing one is deleting both. No other shared file changes, which is
+what lets several games be built in parallel without collisions.
+
+The split is what keeps first paint flat as the rack grows. The cabinet renders
+every card from manifests alone, so thirty games cost thirty small manifests
+and zero game modules. A cartridge's code is fetched on launch, behind a
+loading screen; a failed fetch gets a retryable "cartridge jammed" screen
+rather than a cabinet fault, and a second tap during the load cannot start a
+second run. An unlisted folder is an unpublished game.
 
 ## The Legacy Rack games
 

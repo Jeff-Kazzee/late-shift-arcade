@@ -8,7 +8,7 @@ import {
   movePaddle,
   movePaddleTo,
   cpuDir,
-} from '../games/pong/logic.js';
+} from './logic.js';
 
 const midRng = () => 0.5; // serve() with this rng produces a flat serve
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { EVENTS } from '../games/pixel-life/events.js';
+import { EVENTS } from './events.js';
 import {
   newLife,
   eligible,
@@ -9,7 +9,7 @@ import {
   lifeScore,
   STATS,
   MAX_AGE,
-} from '../games/pixel-life/logic.js';
+} from './logic.js';
 
 test('the event table holds 60+ well-formed events with unique ids', () => {
   assert.ok(EVENTS.length >= 60, `only ${EVENTS.length} events`);
