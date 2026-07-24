@@ -15,9 +15,9 @@ session, with hypnogram evidence cited.
 
 | Operator | Fielded | Won | Notes |
 | --- | --- | --- | --- |
-| Condensation | 1 | 0 | assist: pause-as-stopped-clock fused into s2026-07-23 winner (hypnogram 3–4) |
-| Displacement | 3 | 2 | won s2026-07-24 expansion-plan burst: four-game emotional/verb sequence (hypnogram s2026-07-24 4–5) |
+| Condensation | 2 | 1 | won F-002: one entry fused serializable manifest with private fresh-launch capability (hypnogram 38–39) |
+| Displacement | 4 | 2 | F-002 shipping-catalog branch reinforced sealed metadata and launch embargoes (hypnogram 38–39) |
 | Day-residue | 1 | 0 | over-engineered (signal DAG); killed in revision |
-| Negation-blindness | 1 | 1 | won burst #1: screens-yield-successor shell architecture |
-| Nightmare | 1 | 1 | won s2026-07-24 platform-plan review: caught false dependency chains, sandbox overclaim, and underspecified score contracts (hypnogram 10–11) |
-| Lucidity | 0 | 0 | — |
+| Negation-blindness | 2 | 1 | F-002 launch-permit branch informed fail-closed validation and runtime gates (hypnogram 38–42) |
+| Nightmare | 3 | 2 | F-002 exposed future cross-version score contamination and transferred it to F-003 without changing Legacy score keys (hypnogram 41–43) |
+| Lucidity | 3 | 1 | F-002 separated serializable metadata from runtime capability; separate binding map remained the runner-up (hypnogram 38–39) |

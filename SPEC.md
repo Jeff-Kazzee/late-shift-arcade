@@ -1,19 +1,62 @@
-# Late Shift Arcade — spec
+# Late Shift Arcade — platform spec
 
-One static website, eight retro games, one cabinet shell. CRT feel, night
-palette. No dependencies, no build step. Keep it simple.
+## Product charter
 
-## The shell (build first)
+Late Shift Arcade is a curated compendium of small, complete, AI-made browser
+games with a shared cabinet shell. The original eight shipped games form the
+**Legacy Rack** and remain continuously playable while the compendium grows.
+The current site keeps its CRT feel and night palette; new runtimes extend the
+platform without replacing that working rack.
+
+“AI-made” means a disclosed material AI contribution to design, code, art,
+audio, testing, or iteration; human editing is expected and raw prompts are
+not required for publication.
+
+## Supported runtime and trust contract
+
+The platform supports four code classes. The versioned game contract is their
+shared behavioral seam; it does not grant every class the same privileges.
+
+| Class | Runtime | Trust and isolation |
+| --- | --- | --- |
+| **Shell** | Platform-owned HTML, CSS, and JavaScript | Trusted code on the platform origin. It owns navigation, catalog and lifecycle coordination, shared input, score presentation, and all future identity/storage capability boundaries. |
+| **First-party 2D cartridges** | Same-origin vanilla ES modules and Canvas | Trusted first-party code. Legacy Rack games use the current in-process cartridge interface, have no build step or dependencies, and receive only shell-supplied game context. |
+| **First-party 3D cartridges** | Self-contained, isolated first-party builds using Three.js/WebGL when introduced by a later ticket | Trusted first-party code with renderer dependencies and build output isolated from the static shell. It communicates through the versioned game contract and owns cleanup of its runtime and GPU resources. |
+| **Community cartridges** | Reviewed packages on a separate origin in sandboxed iframes with restrictive CSP | Reviewed code remains untrusted. It communicates only through capability-scoped versioned messages. Community code never shares the platform origin or receives platform identity, session, credential, or storage privileges. |
+
+Publication review changes a community cartridge's catalog eligibility, not
+its trust level. No future runtime may move community code onto the platform
+origin or expose privileged platform objects to it.
+
+Canonical simulation state belongs in plain, serializable data outside Canvas,
+DOM, audio, Three.js, WebGL, and network objects. Pure rules advance that state;
+renderers project it. Saveable state and seeded randomness stay outside render
+objects wherever practical.
+
+Every new public game must satisfy the canonical **complete-game** contract and
+its **release-proof** requirements in `GAME_ROADMAP.md`, under “What qualifies
+as a complete game.” That roadmap section is the source of truth; this spec
+does not duplicate its checklist.
+
+## The Legacy Rack shell
 
 - `index.html` boots an attract screen ("LATE SHIFT ARCADE", blinking
-  "INSERT COIN — coin not required"), then a game-select grid.
-- Each game is an ES module implementing the cartridge interface:
+  "INSERT COIN — coin not required"), then a game-select grid, then a game
+  detail screen that precedes every launch.
+- Each Legacy Rack game is an ES module implementing the current cartridge
+  interface:
   `{ id, title, blurb, init(ctx), update(dt, input), draw(ctx2d), destroy() }`.
   The shell owns the canvas, fixed-timestep loop, input, and scores. Games
   own nothing global.
-- `games/registry.js` wraps cartridge factories in immutable catalog entries
-  with genre, controls, player count, accent, and tags. Every launch creates a
-  fresh validated instance; a failed `init` is cleaned up transactionally.
+- `games/registry.js` pairs each cartridge factory with one deeply frozen
+  schema-version-1 catalog manifest — see "The catalog manifest" below. Every
+  launch creates a fresh validated instance; a failed `init` is cleaned up
+  transactionally. Only validated, `published`, `first-party-2d` entries can
+  launch; every other runtime and status fails closed before the factory runs.
+- Every game is addressable at `?game=<slug>&version=<version>`, which opens
+  its detail screen. Query parameters keep the site deployable from any static
+  file server with no rewrite rules. Browser Back/Forward reconciles the route
+  and disposes the outgoing screen.
 - The cabinet selector is a touch-sized 2×4 grid with paging, so adding a game
   is a registry entry rather than a shell layout rewrite.
 - Shared modules:
@@ -27,7 +70,53 @@ palette. No dependencies, no build step. Keep it simple.
     `prefers-reduced-motion`.
 - Pause (Esc), instant restart (R / tap), back to cabinet (Q / ✕).
 
-## The games (one WAKE block each, in this order)
+## The catalog manifest
+
+Every catalog entry owns one deeply frozen, JSON-serializable manifest. The
+shell validates it when the entry is defined and rejects non-allowlisted keys,
+accessor-backed values, and inherited properties, so a manifest is plain own
+data by construction. Cabinet cards and detail routes read the same frozen
+object, which is what prevents metadata drift between them.
+
+`schemaVersion` is `1`. Every field is required except `source`.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `schemaVersion` | number | Must be `1` |
+| `slug` | string | Lowercase alphanumerics with single hyphens. Stable catalog key, and the local high-score key |
+| `version` | string | `MAJOR.MINOR.PATCH`. Immutable once published |
+| `title` | string | Display name |
+| `summary` | string | One-line description |
+| `creator` | string | Attribution |
+| `runtime` | enum | `first-party-2d`, `first-party-3d`, `community-iframe` |
+| `trustLevel` | enum | `trusted-first-party`, `untrusted-community` |
+| `modes` | string[] | e.g. `solo`, `local-multiplayer` |
+| `goal` | string | The win condition in one sentence |
+| `scoreLabel` | string | What the score measures |
+| `controls` | string[] | e.g. `MOVE`, `DRAG`, `FIRE` |
+| `genre` | string | Catalog facet |
+| `players` | string | e.g. `1`, `1–2` |
+| `tags` | string[] | Catalog facets |
+| `artwork` | object | `{ accent }` — a colour key from `shell/palette.js` |
+| `releaseStatus` | enum | `published`, `suspended` |
+| `contentNotes` | string[] | Content disclosure. May be empty |
+| `madeWith` | string | The AI-made disclosure |
+| `source` | string | **Optional.** HTTP(S) URL |
+
+Two rules are enforced rather than merely documented:
+
+- **Runtime and trust level are paired.** `community-iframe` requires
+  `untrusted-community`, and `untrusted-community` requires `community-iframe`.
+  Community code cannot claim first-party trust, and first-party runtimes
+  cannot be marked untrusted.
+- **Suspension hides the game, not the page.** A `suspended` entry stays
+  resolvable so its detail screen can explain the suspension, but it cannot
+  launch.
+
+Schema changes are versioned. Raising `schemaVersion` is a migration ticket,
+not an edit.
+
+## The Legacy Rack games
 
 ### 1. PONG
 
@@ -87,7 +176,7 @@ the car horizontally.
 > table in `games/pixel-life/events.js`), is built, tested, and kept in the
 > tree — swapped out of the cabinet for GALAXY RAID on 2026-07-23.
 
-## Done means
+## Legacy Rack completion contract
 
 - Shell + eight games playable with keyboard/mouse AND touch on a phone.
 - `npm test` green: pure-logic tests per game (paddle/ball math, puck
@@ -95,3 +184,7 @@ the car horizontally.
   gating).
 - No console errors; runs from any static file server.
 - Deployed to GitHub Pages.
+
+These criteria remain supported throughout later platform migrations. New
+compendium releases also pass the complete-game and release-proof contracts in
+`GAME_ROADMAP.md` through the runtime and trust class assigned above.
