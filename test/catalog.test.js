@@ -43,7 +43,7 @@ test('detail routes fail closed for missing or mismatched versions', () => {
   );
 });
 
-test('all eight Legacy Rack cards and detail routes share complete manifests', () => {
+test('every rack card and detail route shares a complete manifest', () => {
   const requiredFields = [
     'slug',
     'version',
@@ -64,6 +64,7 @@ test('all eight Legacy Rack cards and detail routes share complete manifests', (
   // than an exact count so a new cartridge is one registry entry, not a
   // shared-test edit that every concurrent game branch has to merge.
   assert.ok(cartridges.length >= 8);
+  assert.ok(cartridges.length >= 8, 'the legacy rack stays intact');
   for (const entry of cartridges) {
     const cardManifest = entry.manifest;
     const directUrl = detailUrlFor(cardManifest, 'https://example.com/index.html');

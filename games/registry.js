@@ -21,6 +21,7 @@ import { manifest as lunarDescent } from './lunar-descent/manifest.js';
 import { manifest as midnightRun } from './midnight-run/manifest.js';
 import { manifest as pinballAfterDark } from './pinball-after-dark/manifest.js';
 import { manifest as railSwitch } from './rail-switch/manifest.js';
+import { manifest as orbitalSalvage } from './orbital-salvage/manifest.js';
 
 // Pixel Life's module and tests live on in games/pixel-life; it left the
 // rack when GALAXY RAID took slot five (2026-07-23). An unlisted folder is
@@ -42,4 +43,8 @@ export const cartridges = validateCatalog([
     lazyModule('./pinball-after-dark/pinball-after-dark.js', import.meta.url),
   ),
   defineCatalogEntry(railSwitch, lazyModule('./rail-switch/rail-switch.js', import.meta.url)),
+  defineCatalogEntry(
+    orbitalSalvage,
+    lazyModule('./orbital-salvage/orbital-salvage.js', import.meta.url),
+  ),
 ]);
