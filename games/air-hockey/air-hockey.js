@@ -23,12 +23,15 @@ function saveWins(n) {
   }
 }
 
+const PLAYER_SPEED = 1500; // fast enough to feel 1:1, slow enough not to tunnel
+
 export function createAirHockey() {
   let shell = null;
   let state = null;
   let reported = false;
   let cpuSpeed = 240;
   let t = 0;
+  let trail = [];
 
   return {
     id: 'air-hockey',
@@ -39,24 +42,31 @@ export function createAirHockey() {
       state = newGame();
       reported = false;
       t = 0;
+      trail = [];
       cpuSpeed = Math.min(520, 240 + loadWins() * 55);
     },
     update(dt, input) {
       t += dt;
 
-      // player mallet: drag rules, keys as fallback
+      // player mallet: keys steer directly; otherwise pursue the pointer
+      // (hover or touch) at a capped speed — never teleport through the puck
       const m = state.mallets[0];
-      if (input.pointer.down) {
-        setMallet(state, 0, input.pointer.x, input.pointer.y, dt);
-      } else {
-        let dx = 0;
-        let dy = 0;
-        if (input.down('left')) dx -= 1;
-        if (input.down('right')) dx += 1;
-        if (input.down('up')) dy -= 1;
-        if (input.down('down')) dy += 1;
-        const speed = 420;
-        setMallet(state, 0, m.x + dx * speed * dt, m.y + dy * speed * dt, dt);
+      let kx = 0;
+      let ky = 0;
+      if (input.down('left')) kx -= 1;
+      if (input.down('right')) kx += 1;
+      if (input.down('up')) ky -= 1;
+      if (input.down('down')) ky += 1;
+      if (kx !== 0 || ky !== 0) {
+        setMallet(state, 0, m.x + kx * 420 * dt, m.y + ky * 420 * dt, dt);
+      } else if (input.pointer.moved) {
+        const px = input.pointer.x - m.x;
+        const py = input.pointer.y - m.y;
+        const dist = Math.hypot(px, py);
+        if (dist > 0.5) {
+          const k = Math.min(1, (PLAYER_SPEED * dt) / dist);
+          setMallet(state, 0, m.x + px * k, m.y + py * k, dt);
+        }
       }
 
       // CPU mallet: bounded pursuit of its target
@@ -72,6 +82,18 @@ export function createAirHockey() {
       }
 
       const events = step(state, dt);
+      if (events.includes('hit')) shell.sfx.play('hit');
+      if (events.includes('wall')) shell.sfx.play('wall');
+      if (events.includes('goal')) {
+        shell.sfx.play('score');
+        shell.shake(6);
+        trail = [];
+      }
+
+      if (Math.hypot(state.puck.vx, state.puck.vy) > 40) {
+        trail.push({ x: state.puck.x, y: state.puck.y });
+        if (trail.length > 12) trail.shift();
+      }
 
       if (events.includes('win') && !reported) {
         reported = true;
@@ -148,7 +170,14 @@ export function createAirHockey() {
       mallet(state.mallets[0], pal.cream);
       mallet(state.mallets[1], pal.periwinkle);
 
-      // puck
+      // puck + trail
+      trail.forEach((p, i) => {
+        const f = (i + 1) / trail.length;
+        ctx.fillStyle = `rgba(230,193,126,${(0.25 * f).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, CFG.PUCK_R * (0.3 + 0.7 * f), 0, Math.PI * 2);
+        ctx.fill();
+      });
       ctx.shadowColor = pal.amber;
       ctx.shadowBlur = 14;
       ctx.fillStyle = pal.amber;

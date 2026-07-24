@@ -30,23 +30,30 @@ export function topScore(list) {
 
 const keyFor = (gameId) => `late-shift-arcade:scores:${gameId}`;
 
+// When localStorage is blocked (private mode, cookie lockdown), scores fall
+// back to this in-memory table so the HI column still reflects the visit —
+// entering initials must never save into the void.
+const memStore = new Map();
+
 export function loadScores(gameId) {
   try {
     const raw = globalThis.localStorage?.getItem(keyFor(gameId));
-    const parsed = raw ? JSON.parse(raw) : [];
+    if (raw == null) return memStore.get(gameId) ?? [];
+    const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(
       (e) => e && typeof e.score === 'number' && typeof e.initials === 'string',
     );
   } catch {
-    return [];
+    return memStore.get(gameId) ?? [];
   }
 }
 
 export function saveScores(gameId, list) {
+  memStore.set(gameId, list);
   try {
     globalThis.localStorage?.setItem(keyFor(gameId), JSON.stringify(list));
   } catch {
-    // Storage full or blocked: scores just don't persist this run.
+    // Storage blocked: the in-memory copy carries the session.
   }
 }

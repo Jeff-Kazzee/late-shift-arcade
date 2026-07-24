@@ -9,6 +9,7 @@ export function createAsteroidDefender() {
   let reported = false;
   let t = 0;
   let aim = { x: CFG.W / 2, y: 200 };
+  let boomCooldown = 0; // rate-limit blast noise during big chains
 
   return {
     id: 'asteroid-defender',
@@ -22,13 +23,26 @@ export function createAsteroidDefender() {
     },
     update(dt, input) {
       t += dt;
+      boomCooldown -= dt;
       aim = { x: input.pointer.x, y: input.pointer.y };
-      if (input.pointer.justDown) fire(state, input.pointer.x, input.pointer.y);
+      if (input.pointer.justDown && fire(state, input.pointer.x, input.pointer.y)) {
+        shell.sfx.play('launch');
+      }
 
-      step(state, dt);
+      const events = step(state, dt);
+      if (events.includes('blast') && boomCooldown <= 0) {
+        shell.sfx.play('boom');
+        boomCooldown = 0.09;
+      }
+      if (events.includes('building-lost')) {
+        shell.sfx.play('bigboom');
+        shell.shake(8);
+      }
+      if (events.includes('wave-clear')) shell.sfx.play('fanfare');
 
       if (state.over && !reported) {
         reported = true;
+        shell.shake(10);
         shell.endGame(state.score);
       }
     },

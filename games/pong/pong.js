@@ -13,6 +13,7 @@ export function createPong() {
   let sel = 0;
   let reported = false;
   let t = 0;
+  let trail = [];
 
   const optionRect = (i) => ({
     x: CFG.W / 2 - 150,
@@ -27,6 +28,7 @@ export function createPong() {
     mode = chosen;
     state = newGame();
     reported = false;
+    trail = [];
   }
 
   function updateModeSelect(input) {
@@ -49,28 +51,46 @@ export function createPong() {
     if (mode === 1) {
       if (input.down('arrowup')) p1 -= 1;
       if (input.down('arrowdown')) p1 += 1;
-      if (input.pointer.down) movePaddleTo(state, 0, input.pointer.y);
+      if (p1 !== 0) movePaddle(state, 0, p1, dt);
+      else if (input.pointer.moved) movePaddleTo(state, 0, input.pointer.y); // hover steers
       movePaddle(state, 1, cpuDir(state) * CPU_SPEED, dt);
     } else {
       let p2 = 0;
       if (input.down('arrowup')) p2 -= 1;
       if (input.down('arrowdown')) p2 += 1;
       movePaddle(state, 1, p2, dt);
-      if (input.pointer.down) {
-        if (input.pointer.x < CFG.W / 2) movePaddleTo(state, 0, input.pointer.y);
-        else movePaddleTo(state, 1, input.pointer.y);
+      movePaddle(state, 0, p1, dt);
+      // split-screen touch: each finger drives the paddle on its side
+      for (const touch of input.touches()) {
+        if (touch.x < CFG.W / 2) movePaddleTo(state, 0, touch.y);
+        else movePaddleTo(state, 1, touch.y);
       }
     }
-    movePaddle(state, 0, p1, dt);
 
-    step(state, dt);
-
-    if (state.winner !== null && mode === 1 && !reported) {
-      reported = true;
-      const bonus = state.winner === 0 ? 500 : 0;
-      shell.endGame(state.scores[0] * 100 + bonus);
+    const events = step(state, dt);
+    if (events.includes('paddle')) shell.sfx.play('hit');
+    if (events.includes('wall')) shell.sfx.play('wall');
+    if (events.includes('score')) {
+      shell.sfx.play('score');
+      shell.shake(4);
+      trail = [];
     }
-    // In 2P the win banner is drawn here and R (shell restart) starts over.
+    if (events.includes('serve')) trail = [];
+
+    if (state.serveIn <= 0 && state.winner === null) {
+      trail.push({ x: state.ball.x, y: state.ball.y });
+      if (trail.length > 12) trail.shift();
+    }
+
+    if (state.winner !== null && !reported) {
+      reported = true;
+      if (mode === 1) {
+        const bonus = state.winner === 0 ? 500 : 0;
+        shell.endGame(state.scores[0] * 100 + bonus);
+      } else {
+        shell.sfx.play('fanfare'); // 2P: somebody in the room won
+      }
+    }
   }
 
   return {
@@ -84,6 +104,14 @@ export function createPong() {
       sel = 0;
       reported = false;
       t = 0;
+      trail = [];
+    },
+    // Shell R: a rematch keeps the chosen mode instead of re-asking 1P/2P.
+    restart() {
+      reported = false;
+      trail = [];
+      t = 0;
+      if (mode !== null) state = newGame();
     },
     update(dt, input) {
       t += dt;
@@ -175,8 +203,15 @@ export function createPong() {
       );
       ctx.fill();
 
-      // ball
+      // ball + trail
       if (state.serveIn <= 0 && state.winner === null) {
+        trail.forEach((p, i) => {
+          const f = (i + 1) / trail.length;
+          ctx.fillStyle = `rgba(230,193,126,${(0.3 * f).toFixed(3)})`;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, CFG.BALL_R * (0.35 + 0.65 * f), 0, Math.PI * 2);
+          ctx.fill();
+        });
         ctx.shadowColor = pal.amber;
         ctx.shadowBlur = 14;
         ctx.fillStyle = pal.amber;

@@ -19,6 +19,22 @@ export function createBreakout() {
   let state = null;
   let reported = false;
   let t = 0;
+  let trail = [];
+  let particles = [];
+  let tapStart = null;
+
+  const spawnBurst = (x, y, color, n) => {
+    for (let i = 0; i < n; i += 1) {
+      particles.push({
+        x,
+        y,
+        vx: (Math.random() - 0.5) * 260,
+        vy: -Math.random() * 200 - 40,
+        life: 0.4 + Math.random() * 0.25,
+        color,
+      });
+    }
+  };
 
   return {
     id: 'breakout',
@@ -29,6 +45,9 @@ export function createBreakout() {
       state = newGame();
       reported = false;
       t = 0;
+      trail = [];
+      particles = [];
+      tapStart = null;
     },
     update(dt, input) {
       t += dt;
@@ -36,13 +55,52 @@ export function createBreakout() {
       if (input.down('left')) dir -= 1;
       if (input.down('right')) dir += 1;
       if (dir !== 0) movePaddle(state, dir, dt);
-      if (input.pointer.down) movePaddleTo(state, input.pointer.x);
-      if (input.pressed('action') || input.pointer.justDown) launch(state);
+      else if (input.pointer.moved) movePaddleTo(state, input.pointer.x); // hover steers
 
-      step(state, dt);
+      // touch: only a quick, still tap launches — dragging just moves the
+      // paddle, so sticky catch-and-aim is actually aimable
+      if (input.pointer.justDown) tapStart = { x: input.pointer.x, at: t };
+      if (input.pointer.justUp && tapStart) {
+        const quick = t - tapStart.at < 0.25 && Math.abs(input.pointer.x - tapStart.x) < 14;
+        if (quick && launch(state)) shell.sfx.play('launch');
+        tapStart = null;
+      }
+      if (input.pressed('action') && launch(state)) shell.sfx.play('launch');
+
+      const events = step(state, dt);
+      if (events.includes('paddle')) shell.sfx.play('hit');
+      if (events.includes('wall')) shell.sfx.play('wall');
+      if (events.includes('brick')) {
+        shell.sfx.play('brick');
+        for (const ball of state.balls) spawnBurst(ball.x, ball.y, shell.palette.periwinkle, 5);
+      }
+      if (events.includes('capsule')) shell.sfx.play('capsule');
+      if (events.includes('life-lost')) {
+        shell.sfx.play('lose');
+        shell.shake(6);
+        trail = [];
+      }
+      if (events.includes('level-clear')) {
+        shell.sfx.play('fanfare');
+        trail = [];
+        particles = [];
+      }
+
+      for (const ball of state.balls) {
+        if (!ball.stuck) trail.push({ x: ball.x, y: ball.y });
+      }
+      while (trail.length > 20) trail.shift();
+
+      particles = particles.filter((p) => (p.life -= dt) > 0);
+      for (const p of particles) {
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vy += 380 * dt;
+      }
 
       if (state.over && !reported) {
         reported = true;
+        shell.shake(8);
         shell.endGame(state.score);
       }
     },
@@ -122,7 +180,20 @@ export function createBreakout() {
       );
       ctx.fill();
 
-      // balls
+      // trail, shatter particles, balls
+      trail.forEach((p, i) => {
+        const f = (i + 1) / trail.length;
+        ctx.fillStyle = `rgba(230,193,126,${(0.22 * f).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, CFG.BALL_R * (0.3 + 0.6 * f), 0, Math.PI * 2);
+        ctx.fill();
+      });
+      for (const p of particles) {
+        ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 2.2));
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+      }
+      ctx.globalAlpha = 1;
       ctx.shadowColor = pal.amber;
       ctx.shadowBlur = 12;
       ctx.fillStyle = pal.amber;

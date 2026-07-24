@@ -50,7 +50,9 @@ export function createPixelLife() {
         input.pressed('action') || (input.pointer.justDown && (state.alive ? inButton(input.pointer) : true));
       if (!pressed) return;
       if (state.alive) {
+        shell.sfx.play('click');
         ageUp(state);
+        if (!state.alive) shell.sfx.play('death');
       } else if (!reported) {
         reported = true;
         shell.endGame(lifeScore(state));

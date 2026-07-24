@@ -1,6 +1,7 @@
 // One input singleton owned by the shell. Keyboard + mouse + touch unified:
-// pointer events cover both mouse and touch, coordinates are mapped into
-// canvas logical space. Games read it; they never attach listeners.
+// pointer events cover both, coordinates are mapped into canvas logical
+// space, and every active touch is tracked by pointerId so two-player
+// split-screen play works. Games read it; they never attach listeners.
 
 const ALIASES = {
   up: ['arrowup', 'w'],
@@ -22,12 +23,17 @@ const expand = (name) => ALIASES[name] ?? [name];
 export function createInput(canvas) {
   const held = new Set();
   const edges = new Set();
-  const pointer = { x: 0, y: 0, down: false, justDown: false, justUp: false };
+  const active = new Map(); // pointerId → {x, y} for every finger down
+  // `moved` flips true on the first real pointer motion — games use it to
+  // steer by hover on desktop without demanding a held button.
+  const pointer = { x: 0, y: 0, down: false, justDown: false, justUp: false, moved: false };
 
   const toCanvas = (e) => {
     const rect = canvas.getBoundingClientRect();
-    pointer.x = ((e.clientX - rect.left) * canvas.width) / rect.width;
-    pointer.y = ((e.clientY - rect.top) * canvas.height) / rect.height;
+    return {
+      x: ((e.clientX - rect.left) * canvas.width) / rect.width,
+      y: ((e.clientY - rect.top) * canvas.height) / rect.height,
+    };
   };
 
   const onKeyDown = (e) => {
@@ -39,14 +45,27 @@ export function createInput(canvas) {
   const onKeyUp = (e) => held.delete(norm(e.key));
   const onPointerDown = (e) => {
     canvas.setPointerCapture?.(e.pointerId);
-    toCanvas(e);
+    const p = toCanvas(e);
+    active.set(e.pointerId, p);
+    pointer.x = p.x;
+    pointer.y = p.y;
     pointer.down = true;
     pointer.justDown = true;
+    pointer.moved = true;
   };
-  const onPointerMove = (e) => toCanvas(e);
+  const onPointerMove = (e) => {
+    const p = toCanvas(e);
+    if (active.has(e.pointerId)) active.set(e.pointerId, p);
+    pointer.x = p.x;
+    pointer.y = p.y;
+    pointer.moved = true;
+  };
   const onPointerUp = (e) => {
-    toCanvas(e);
-    pointer.down = false;
+    const p = toCanvas(e);
+    active.delete(e.pointerId);
+    pointer.x = p.x;
+    pointer.y = p.y;
+    pointer.down = active.size > 0;
     pointer.justUp = true;
   };
 
@@ -59,6 +78,8 @@ export function createInput(canvas) {
 
   return {
     pointer,
+    // Every finger currently down, in canvas coordinates.
+    touches: () => Array.from(active.values()),
     // Semantic names ('up', 'action') or raw keys ('w', 'space') both work —
     // 2-player games read raw keys so W/S and the arrows stay distinct.
     down: (...names) => names.some((n) => expand(n).some((k) => held.has(k))),

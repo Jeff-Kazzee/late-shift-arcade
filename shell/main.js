@@ -6,6 +6,7 @@
 import { palette } from './palette.js';
 import { createInput } from './input.js';
 import { createCrt } from './crt.js';
+import { createSfx } from './sfx.js';
 import { advance, STEP_MS } from './loop.js';
 import {
   loadScores,
@@ -15,6 +16,20 @@ import {
   topScore,
 } from './scores.js';
 import { cartridges } from '../games/registry.js';
+
+// Pre-2022 Safari/Firefox lack roundRect; every cartridge uses it.
+if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function roundRect(x, y, w, h, r) {
+    const rr = Math.max(0, Math.min(Array.isArray(r) ? r[0] : r ?? 0, w / 2, h / 2));
+    this.moveTo(x + rr, y);
+    this.arcTo(x + w, y, x + w, y + h, rr);
+    this.arcTo(x + w, y + h, x, y + h, rr);
+    this.arcTo(x, y + h, x, y, rr);
+    this.arcTo(x, y, x + w, y, rr);
+    this.closePath();
+    return this;
+  };
+}
 
 const canvas = document.getElementById('screen');
 const ctx2d = canvas.getContext('2d');
@@ -26,6 +41,12 @@ const reducedMotion =
   window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 const input = createInput(canvas);
 const crt = createCrt({ reducedMotion });
+const sfx = createSfx();
+
+// Autoplay policy: the AudioContext only exists after a user gesture.
+const unlockSfx = () => sfx.unlock();
+window.addEventListener('keydown', unlockSfx);
+window.addEventListener('pointerdown', unlockSfx);
 
 let ejectClicked = false;
 exitButton.addEventListener('click', () => {
@@ -41,9 +62,10 @@ const showEject = (on) => {
 };
 
 function fitCanvas() {
-  const pad = 72; // cabinet bezel + breathing room
+  // bezel + breathing room, shrinking on small (portrait phone) viewports
+  const pad = Math.min(72, window.innerWidth * 0.08);
   const scale = Math.max(
-    0.4,
+    0.25,
     Math.min((window.innerWidth - pad) / W, (window.innerHeight - pad) / H),
   );
   canvas.style.width = `${Math.floor(W * scale)}px`;
@@ -88,7 +110,10 @@ function attractScreen() {
   return {
     update(dt) {
       t += dt;
-      if (input.pressed('action') || input.pointer.justDown) return selectScreen();
+      if (input.pressed('action') || input.pointer.justDown) {
+        sfx.play('coin');
+        return selectScreen();
+      }
     },
     draw() {
       // night sky
@@ -151,7 +176,7 @@ function attractScreen() {
           glow: 6,
         });
       }
-      text('press SPACE or tap', W / 2, H - 30, { size: 12, color: palette.rose });
+      text('press SPACE or tap · M mutes', W / 2, H - 30, { size: 12, color: palette.rose });
     },
   };
 }
@@ -164,15 +189,25 @@ function selectScreen() {
 
   return {
     update() {
-      if (input.pressed('up')) index = (index + cartridges.length - 1) % cartridges.length;
-      if (input.pressed('down')) index = (index + 1) % cartridges.length;
-      if (input.pressed('pause')) return attractScreen();
-      if (input.pressed('action')) return gameScreen(cartridges[index]);
+      if (input.pressed('up', 'down')) {
+        sfx.play('move');
+        if (input.pressed('up')) index = (index + cartridges.length - 1) % cartridges.length;
+        else index = (index + 1) % cartridges.length;
+      }
+      if (input.pressed('pause')) {
+        sfx.play('pause');
+        return attractScreen();
+      }
+      if (input.pressed('action')) {
+        sfx.play('start');
+        return gameScreen(cartridges[index]);
+      }
       if (input.pointer.justDown) {
         for (let i = 0; i < cartridges.length; i += 1) {
           const r = rowRect(i);
           const p = input.pointer;
           if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) {
+            sfx.play('start');
             return gameScreen(cartridges[i]);
           }
         }
@@ -234,15 +269,23 @@ function gameScreen(cart) {
   let paused = false;
   let finished = null; // { score } once the cartridge calls endGame
   let sincefinish = 0;
+  let shakeT = 0;
+  let shakeMag = 0;
 
   const gameCtx = {
     width: W,
     height: H,
     palette,
+    sfx,
     highScore: topScore(loadScores(cart.id)),
+    shake(power = 5) {
+      shakeMag = power;
+      shakeT = 0.25;
+    },
     endGame(score) {
       finished = { score: Math.max(0, Math.round(score)) };
       sincefinish = 0;
+      sfx.play(qualifies(loadScores(cart.id), finished.score) ? 'fanfare' : 'lose');
     },
   };
 
@@ -253,41 +296,60 @@ function gameScreen(cart) {
   const eject = () => {
     cart.destroy();
     showEject(false);
+    sfx.play('pause');
     return selectScreen();
   };
   const restart = () => {
-    cart.destroy();
-    cart.init(gameCtx);
+    // a cartridge may provide its own restart (e.g. pong rematch keeps mode)
+    if (cart.restart) cart.restart();
+    else {
+      cart.destroy();
+      cart.init(gameCtx);
+    }
     paused = false;
     finished = null;
+    sfx.play('click');
   };
 
   return {
     update(dt) {
+      if (shakeT > 0) shakeT -= dt;
       if (input.pressed('eject') || consumeEject()) return eject();
 
       if (finished) {
         sincefinish += dt;
         if (sincefinish < 0.5) return; // debounce the killing blow's input
+        if (input.pressed('restart')) return restart();
         if (qualifies(loadScores(cart.id), finished.score)) {
           if (input.pressed('action') || input.pointer.justDown) {
             cart.destroy();
             showEject(false);
             return initialsScreen(cart, finished.score);
           }
-        } else if (input.pressed('restart', 'action') || input.pointer.justDown) {
+        } else if (input.pressed('action') || input.pointer.justDown) {
           restart();
         }
         return;
       }
 
-      if (input.pressed('pause')) paused = !paused;
+      if (input.pressed('pause')) {
+        paused = !paused;
+        sfx.play('pause');
+      }
       if (input.pressed('restart')) restart();
       if (!paused) cart.update(dt, input); // pause = the clock stops
     },
     draw() {
       clear();
-      cart.draw(ctx2d);
+      if (shakeT > 0) {
+        const k = shakeMag * (shakeT / 0.25);
+        ctx2d.save();
+        ctx2d.translate((Math.random() * 2 - 1) * k, (Math.random() * 2 - 1) * k);
+        cart.draw(ctx2d);
+        ctx2d.restore();
+      } else {
+        cart.draw(ctx2d);
+      }
       if (paused && !finished) {
         ctx2d.fillStyle = 'rgba(11,12,20,0.75)';
         ctx2d.fillRect(0, 0, W, H);
@@ -303,7 +365,7 @@ function gameScreen(cart) {
         text('GAME OVER', W / 2, H / 2 - 30, { size: 28, color: palette.rose });
         text(`SCORE ${finished.score}`, W / 2, H / 2 + 4, { color: palette.cream });
         const hint = qualifies(loadScores(cart.id), finished.score)
-          ? 'NEW HIGH SCORE — tap or SPACE to enter initials'
+          ? 'NEW HIGH SCORE — tap for initials · R to retry'
           : 'tap or R to restart · Q to eject';
         text(hint, W / 2, H / 2 + 36, { size: 14, color: palette.amber });
       }
@@ -321,6 +383,7 @@ function initialsScreen(cart, score) {
   const commit = () => {
     const initials = letters.map((n) => String.fromCharCode(A + n)).join('');
     saveScores(cart.id, insertScore(loadScores(cart.id), { initials, score }));
+    sfx.play('fanfare');
     return selectScreen();
   };
   const cycle = (i, delta) => {
@@ -329,6 +392,7 @@ function initialsScreen(cart, score) {
 
   return {
     update() {
+      if (input.pressed('left', 'right', 'up', 'down')) sfx.play('move');
       if (input.pressed('left')) slot = (slot + 2) % 3;
       if (input.pressed('right')) slot = (slot + 1) % 3;
       if (input.pressed('up')) cycle(slot, 1);
@@ -372,6 +436,30 @@ function initialsScreen(cart, score) {
   };
 }
 
+// A thrown frame costs one frame, never the session: this screen uses only
+// canvas APIs that exist everywhere, and any tap returns to the cabinet.
+function faultScreen(err) {
+  showEject(false);
+  return {
+    update() {
+      if (input.pressed('action') || input.pointer.justDown) return attractScreen();
+    },
+    draw() {
+      ctx2d.fillStyle = palette.ink;
+      ctx2d.fillRect(0, 0, W, H);
+      ctx2d.textAlign = 'center';
+      ctx2d.fillStyle = palette.rose;
+      ctx2d.font = 'bold 24px "Courier New", monospace';
+      ctx2d.fillText('CABINET FAULT', W / 2, H / 2 - 20);
+      ctx2d.fillStyle = palette.periwinkle;
+      ctx2d.font = '13px "Courier New", monospace';
+      ctx2d.fillText(String(err?.message ?? err).slice(0, 70), W / 2, H / 2 + 12);
+      ctx2d.fillStyle = palette.amber;
+      ctx2d.fillText('tap or SPACE to reboot the cabinet', W / 2, H / 2 + 44);
+    },
+  };
+}
+
 // --- Fixed-timestep loop ---------------------------------------------------
 
 let screen = attractScreen();
@@ -380,16 +468,24 @@ let last = performance.now();
 let accMs = 0;
 
 function frame(now) {
+  requestAnimationFrame(frame); // reschedule FIRST: a throw must not kill the loop
   const r = advance(accMs, now - last);
   last = now;
   accMs = r.acc;
-  for (let i = 0; i < r.steps; i += 1) {
-    const next = screen.update(STEP_MS / 1000);
-    if (next) screen = next;
+  try {
+    for (let i = 0; i < r.steps; i += 1) {
+      if (input.pressed('m') && !sfx.toggleMute()) sfx.play('click');
+      const next = screen.update(STEP_MS / 1000);
+      if (next) screen = next;
+      // edges are one-step-sized: a keypress must not fall through into the
+      // next step's screen (attract → select → game on one SPACE)
+      input.endFrame();
+    }
+    screen.draw();
+    crt.draw(ctx2d, W, H, now);
+  } catch (err) {
+    console.error('cabinet fault:', err);
+    screen = faultScreen(err);
   }
-  if (r.steps > 0) input.endFrame();
-  screen.draw();
-  crt.draw(ctx2d, W, H, now);
-  requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
