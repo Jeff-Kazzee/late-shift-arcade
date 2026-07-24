@@ -91,6 +91,25 @@ test('quarantined moves and lifts cannot steer or release the next screen', (t) 
   assert.equal(input.pointer.justUp, true, 'a post-transition pointer still releases normally');
 });
 
+test('a pointer whose capture throws is still tracked', (t) => {
+  const { canvas, input } = setup(t);
+  // The browser throws this when the pointer is gone by the time the handler
+  // runs — synthetic pointer events hit it every time.
+  canvas.setPointerCapture = () => {
+    throw Object.assign(new Error("No active pointer with the given id is found."), {
+      name: 'NotFoundError',
+    });
+  };
+
+  canvas.emit('pointerdown', pointer(1, 110, 70));
+
+  assert.deepEqual(input.touches(), [{ x: 200, y: 100 }], 'the finger still reaches the game');
+  assert.equal(input.pointer.down, true);
+  assert.equal(input.pointer.justDown, true);
+  assert.equal(input.pointer.x, 200);
+  assert.equal(input.pointer.y, 100);
+});
+
 test('detach removes every fake window and canvas listener', (t) => {
   const { canvas, input, windowTarget } = setup(t);
   assert.equal(windowTarget.listenerCount(), 2);

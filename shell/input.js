@@ -49,7 +49,13 @@ export function createInput(canvas) {
   const onKeyUp = (e) => held.delete(norm(e.key));
   const onPointerDown = (e) => {
     if (quarantined.has(e.pointerId)) return;
-    canvas.setPointerCapture?.(e.pointerId);
+    // Capture is an optimisation, not a requirement: it throws NotFoundError
+    // when the pointer is already gone by the time this handler runs. Losing
+    // capture costs us a drag that leaves the canvas; letting the throw escape
+    // would cost us the whole touch, so the finger gets registered either way.
+    try {
+      canvas.setPointerCapture?.(e.pointerId);
+    } catch {}
     const p = toCanvas(e);
     active.set(e.pointerId, p);
     pointer.x = p.x;
