@@ -104,6 +104,9 @@ export function createPinballAfterDark() {
   function readPlunger(dt, input) {
     const touches = input.touches();
     const keyDown = input.down('down', 's', 'action');
+    // The edge matters as well as the hold: a tap that starts and ends inside
+    // one frame never shows up in `down`, and the plunger would ignore it.
+    if (input.pressed('down', 's', 'action')) keyHeld = true;
 
     if (touches.length > 0) {
       if (!gestureFrom) gestureFrom = { x: touches[0].x, y: touches[0].y };
@@ -184,7 +187,7 @@ export function createPinballAfterDark() {
 
   // --- drawing ------------------------------------------------------------
 
-  function drawTable(ctx, pal) {
+  function drawTable(ctx, pal, text) {
     // district territory glow, so the table reads as four parts of a city
     for (let i = 0; i < DISTRICTS.length; i += 1) {
       const status = displayStatus(state.districts[i]);
@@ -273,11 +276,16 @@ export function createPinballAfterDark() {
       const beat = status === 'armed' ? 6 + 6 * Math.sin(t * 7) : status === 'lit' ? 12 : 0;
       ctx.shadowColor = color;
       ctx.shadowBlur = beat;
-      ctx.fillStyle = color;
+      ctx.fillStyle = status === 'dark' ? 'rgba(159,168,232,0.16)' : color;
       ctx.beginPath();
       ctx.roundRect(spot.x - spot.r, spot.y - spot.r, spot.r * 2, spot.r * 2, 3);
       ctx.fill();
       ctx.shadowBlur = 0;
+      ctx.strokeStyle = status === 'dark' ? pal.periwinkle : color;
+      ctx.stroke();
+      text(DISTRICTS[i].name.slice(0, 1), spot.x, spot.y + 4, {
+        size: 10, color: status === 'dark' ? pal.periwinkle : pal.ink, bold: true,
+      });
     }
 
     // substation
@@ -353,22 +361,28 @@ export function createPinballAfterDark() {
     ctx.lineTo(W, 58);
     ctx.stroke();
 
-    text(finalScore(state).toLocaleString('en-US'), 16, 34, {
+    // The big number is what the TABLE has paid. The end-of-run bonus is shown
+    // separately and pending: opening a run on "100,000" because two balls are
+    // still in the drawer reads as a score the player has not earned.
+    text(state.tablePoints.toLocaleString('en-US'), 16, 34, {
       size: 24, bold: true, color: pal.cream, align: 'left',
     });
     const grid = gridMultiplier(state);
     text(`GRID ×${grid}`, 16, 51, {
       size: 12, color: grid > 1 ? pal.amber : pal.rose, align: 'left', bold: grid > 2,
     });
+    text(`BONUS +${(finalScore(state) - state.tablePoints).toLocaleString('en-US')}`, 100, 51, {
+      size: 11, color: pal.periwinkle, align: 'left',
+    });
 
     for (let i = 0; i < DISTRICTS.length; i += 1) {
       const district = state.districts[i];
       const status = displayStatus(district);
       const color = pal[STATUS_COLOR[status]];
-      const x = 236 + i * 80;
+      const x = 214 + i * 72;
       ctx.strokeStyle = status === 'dark' ? pal.hairline : color;
       ctx.beginPath();
-      ctx.roundRect(x, 10, 74, 38, 5);
+      ctx.roundRect(x, 10, 66, 38, 5);
       ctx.stroke();
       if (status === 'armed') {
         ctx.globalAlpha = 0.1 + 0.08 * Math.sin(t * 7);
@@ -376,32 +390,37 @@ export function createPinballAfterDark() {
         ctx.fill();
         ctx.globalAlpha = 1;
       }
-      text(DISTRICTS[i].name, x + 37, 26, {
+      text(DISTRICTS[i].name, x + 33, 26, {
         size: 10, color: status === 'dark' ? pal.rose : color, bold: status !== 'dark',
       });
       for (let pip = 0; pip < DISTRICTS[i].need; pip += 1) {
         const filled = status === 'lit' || status === 'armed' || pip < district.charge;
         ctx.fillStyle = filled ? color : pal.hairline;
-        ctx.fillRect(x + 37 - (DISTRICTS[i].need * 9) / 2 + pip * 9, 34, 6, 6);
+        ctx.fillRect(x + 33 - (DISTRICTS[i].need * 9) / 2 + pip * 9, 34, 6, 6);
       }
-      text(status === 'lit' ? 'LIT' : status === 'armed' ? 'ARMED' : '', x + 37, 46, {
+      text(status === 'lit' ? 'LIT' : status === 'armed' ? 'ARMED' : '', x + 33, 46, {
         size: 8, color,
       });
     }
 
-    text(`BALL ${CFG.BALLS - state.ballsLeft}/${CFG.BALLS}`, W - 16, 26, {
+    // The shell's eject button floats over the canvas top-right, so nothing
+    // legible may sit right of x=584.
+    text(`BALL ${CFG.BALLS - state.ballsLeft}/${CFG.BALLS}`, 584, 26, {
       size: 12, color: pal.periwinkle, align: 'right',
     });
     if (state.mode === 'blackout') {
-      text(`JACKPOT ${state.jackpots}/${CFG.JACKPOTS_TO_WIN}`, W - 16, 46, {
+      text(`JACKPOT ${state.jackpots}/${CFG.JACKPOTS_TO_WIN}`, 584, 46, {
         size: 11, color: pal.amber, align: 'right', bold: true,
       });
     } else if (state.saveTimer > 0) {
-      text('BALL SAVE', W - 16, 46, { size: 11, color: pal.cream, align: 'right' });
+      text('BALL SAVE', 584, 46, { size: 11, color: pal.cream, align: 'right' });
     }
 
     // left apron: the tilt meter, so the cost of nudging is always visible
     text('TILT', 24, 424, { size: 10, color: pal.rose, align: 'left' });
+    text(`${Math.floor(state.elapsed / 60)}:${String(Math.floor(state.elapsed % 60)).padStart(2, '0')}`, 174, 424, {
+      size: 10, color: pal.periwinkle, align: 'right',
+    });
     ctx.strokeStyle = pal.hairline;
     ctx.strokeRect(24, 430, 150, 8);
     ctx.fillStyle = state.tiltLocked ? pal.rose : state.tiltMeter > 0.66 ? pal.amber : pal.deep;
@@ -428,9 +447,6 @@ export function createPinballAfterDark() {
     text('FLIP ←/→ or thumbs · NUDGE Z/X or edges', W - 24, 446, {
       size: 10, color: pal.rose, align: 'right',
     });
-    text(`${Math.floor(state.elapsed / 60)}:${String(Math.floor(state.elapsed % 60)).padStart(2, '0')}`, W - 24, 466, {
-      size: 10, color: pal.periwinkle, align: 'right',
-    });
   }
 
   function drawOverlays(ctx, pal, text) {
@@ -444,8 +460,16 @@ export function createPinballAfterDark() {
       const barX = TABLE.lane.restX - 7;
       ctx.fillStyle = pal.amber;
       ctx.fillRect(barX, 468 - 84 * charge, 14, 4 + 84 * charge);
-      text('SWIPE UP', 300, 300, { size: 20, color: pal.cream, bold: true, glow: 8 });
-      text('or hold SPACE and let go to plunge', 300, 324, { size: 12, color: pal.rose });
+      ctx.fillStyle = 'rgba(11,12,20,0.9)';
+      ctx.beginPath();
+      ctx.roundRect(96, 276, 408, 88, 8);
+      ctx.fill();
+      ctx.strokeStyle = pal.hairline;
+      ctx.stroke();
+      text('SWIPE UP TO PLUNGE', 300, 302, { size: 18, color: pal.cream, bold: true, glow: 8 });
+      text('or hold SPACE and let go - a harder swipe plunges harder', 300, 324, {
+        size: 11, color: pal.rose,
+      });
       text('relight HARBOR · MARKET · TOWER · YARDS, then clear the BLACKOUT', 300, 348, {
         size: 11, color: pal.periwinkle,
       });
@@ -499,7 +523,7 @@ export function createPinballAfterDark() {
       skyline = Array.from({ length: 26 }, (_, i) => ({
         x: i * 25,
         w: 16 + Math.random() * 9,
-        h: 12 + Math.random() * 44,
+        h: 8 + Math.random() * 30,
       }));
       reset();
     },
@@ -554,10 +578,10 @@ export function createPinballAfterDark() {
 
       // skyline behind the table: the city this run is trying to relight
       const { lit } = countDistricts(state);
-      ctx.globalAlpha = 0.5;
+      ctx.globalAlpha = 0.34;
       for (let i = 0; i < skyline.length; i += 1) {
         const block = skyline[i];
-        ctx.fillStyle = i * 4 < lit * skyline.length ? 'rgba(230,193,126,0.28)' : 'rgba(124,136,232,0.13)';
+        ctx.fillStyle = i * 4 < lit * skyline.length ? 'rgba(230,193,126,0.5)' : 'rgba(124,136,232,0.16)';
         ctx.fillRect(block.x, H - block.h, block.w, block.h);
       }
       ctx.globalAlpha = 1;
@@ -567,7 +591,7 @@ export function createPinballAfterDark() {
       if (state.nudgeFx > 0) {
         ctx.translate(state.nudgeDir * state.nudgeFx * 24, state.nudgeFx * -8);
       }
-      drawTable(ctx, pal);
+      drawTable(ctx, pal, text);
       drawFlippers(ctx, pal);
       drawBalls(ctx, pal);
       for (const p of sparks) {

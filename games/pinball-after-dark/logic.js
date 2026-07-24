@@ -211,7 +211,8 @@ export function scoreBreakdown(state) {
     districts: CFG.B_DISTRICT * lit,
     win: state.phase === 'won' ? CFG.B_WIN : 0,
     balls: CFG.B_BALL * Math.max(0, state.ballsLeft),
-    tilt: -CFG.B_TILT * state.tiltWarnings,
+    // Guarded so a clean run reads "0" rather than JavaScript's "-0".
+    tilt: state.tiltWarnings ? -CFG.B_TILT * state.tiltWarnings : 0,
     total: finalScore(state),
   };
 }
