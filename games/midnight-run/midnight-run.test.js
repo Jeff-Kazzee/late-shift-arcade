@@ -10,7 +10,7 @@ import {
   spawnTraffic,
   difficulty,
   terminalScore,
-} from '../games/midnight-run/logic.js';
+} from './logic.js';
 
 const rng = () => 0.25;
 

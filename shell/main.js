@@ -339,7 +339,7 @@ function detailScreen(entry) {
       }
       if (launchable && (input.pressed('action') || input.pointer.justDown)) {
         sfx.play('start');
-        return gameScreen(entry);
+        return loadingScreen(entry);
       }
     },
     draw() {
@@ -389,8 +389,101 @@ function detailScreen(entry) {
   };
 }
 
-function gameScreen(entry) {
+// A cartridge's code arrives over the network, so there is a real moment
+// between "player tapped PLAY" and "game exists". It gets a screen.
+//
+// The load result is polled from update() rather than pushed from the promise:
+// a screen the player has already left is simply never updated again, so
+// ejecting mid-load cannot resurrect a game after the fact.
+function loadingScreen(entry) {
   const manifest = entry.manifest;
+  const accent = palette[manifest.artwork.accent] ?? palette.amber;
+  let t = 0;
+  let loaded = null;
+  let failure = null;
+  showEject(true);
+  consumeEject();
+
+  entry.load().then(
+    (cartridge) => { loaded = cartridge; },
+    (error) => { failure = error; },
+  );
+
+  return {
+    update(dt) {
+      t += dt;
+      if (input.pressed('eject') || input.pressed('pause') || consumeEject()) {
+        sfx.play('pause');
+        showEject(false);
+        showCabinetUrl();
+        return selectScreen();
+      }
+      if (failure) return loadFaultScreen(entry, failure);
+      if (loaded) return gameScreen(loaded);
+      // Launch input is deliberately not read here. A second tap during the
+      // load must not start a second run — and entry.load() is memoised, so
+      // it could not start a second fetch even if this screen let it through.
+    },
+    draw() {
+      clear();
+      text(manifest.title, W / 2, H / 2 - 40, {
+        size: 24, color: accent, bold: true, glow: 8,
+      });
+      text(`LOADING CARTRIDGE${'.'.repeat(Math.floor(t * 3) % 4)}`, W / 2, H / 2 + 6, {
+        size: 14, color: palette.cream,
+      });
+      text('Q TO CABINET', W / 2, H - 40, { size: 11, color: palette.rose });
+    },
+  };
+}
+
+// A module fetch fails for ordinary reasons — a dead connection, a bad deploy.
+// None of them are a cabinet fault, and none of them should cost the player
+// their place: the entry is still here, so retry is one tap.
+function loadFaultScreen(entry, error) {
+  const manifest = entry.manifest;
+  const offline = navigator.onLine === false;
+  showEject(true);
+  consumeEject();
+
+  return {
+    update() {
+      if (input.pressed('eject') || input.pressed('pause') || consumeEject()) {
+        sfx.play('pause');
+        showEject(false);
+        showCabinetUrl();
+        return selectScreen();
+      }
+      if (input.pressed('action') || input.pressed('restart') || input.pointer.justDown) {
+        sfx.play('start');
+        return loadingScreen(entry);
+      }
+    },
+    draw() {
+      clear();
+      text('CARTRIDGE JAMMED', W / 2, H / 2 - 62, {
+        size: 24, color: palette.rose, bold: true,
+      });
+      text(manifest.title, W / 2, H / 2 - 26, { size: 16, color: palette.periwinkle });
+      text(
+        offline
+          ? 'no connection — the game could not be downloaded'
+          : compactLabel(String(error?.message ?? error), 64),
+        W / 2,
+        H / 2 + 8,
+        { size: 12, color: palette.cream },
+      );
+      text('SPACE OR TAP TO RETRY · Q TO CABINET', W / 2, H / 2 + 52, {
+        size: 14, color: palette.amber, bold: true,
+      });
+    },
+  };
+}
+
+// Takes a loaded cartridge, not a catalog entry: by here the code is in hand,
+// so restart stays synchronous and instant.
+function gameScreen(loaded) {
+  const manifest = loaded.manifest;
   let cart = null;
   let disposed = false;
   let paused = false;
@@ -416,7 +509,7 @@ function gameScreen(entry) {
     },
   };
 
-  cart = activateCartridge(entry, gameCtx);
+  cart = activateCartridge(loaded, gameCtx);
   showEject(true);
   consumeEject();
 
@@ -437,7 +530,7 @@ function gameScreen(entry) {
     if (cart.restart) cart.restart();
     else {
       cart.destroy();
-      cart = activateCartridge(entry, gameCtx);
+      cart = activateCartridge(loaded, gameCtx);
     }
     paused = false;
     finished = null;
@@ -456,7 +549,7 @@ function gameScreen(entry) {
         if (qualifies(loadScores(manifest.slug), finished.score)) {
           if (input.pressed('action') || input.pointer.justDown) {
             dispose();
-            return initialsScreen(entry, finished.score);
+            return initialsScreen(loaded, finished.score);
           }
         } else if (input.pressed('action') || input.pointer.justDown) {
           restart();

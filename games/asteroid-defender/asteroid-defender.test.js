@@ -8,7 +8,7 @@ import {
   step,
   fire,
   blockX,
-} from '../games/asteroid-defender/logic.js';
+} from './logic.js';
 
 const rng = () => 0.5;
 

@@ -9,7 +9,7 @@ import {
   queueTurn,
   spawnFood,
   step,
-} from '../games/neon-snake/logic.js';
+} from './logic.js';
 
 const firstCell = () => 0;
 

@@ -2,12 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   activateCartridge,
-  defineCartridge,
+  defineCatalogEntry,
+  lazyModule,
   validateCatalog,
   validateManifest,
 } from '../shell/cartridge.js';
 
-// Identity is declared here, not read back from the instance the factory
+// Identity is declared here, not read back from the instance the module
 // returns. The manifest is the claim; the cartridge must match it.
 const DETAILS = {
   schemaVersion: 1,
@@ -45,9 +46,26 @@ function makeCartridge(overrides = {}) {
   };
 }
 
-test('defineCartridge publishes an immutable versioned manifest and creates fresh instances', () => {
-  const entry = defineCartridge(() => makeCartridge(), DETAILS);
+// Stands in for `() => import('./pong/pong.js')`: a function resolving to a
+// module whose default export is the cartridge factory.
+function moduleLoader(factory) {
+  return async () => ({ default: factory });
+}
 
+function defineTestEntry(factory = () => makeCartridge(), metadata = DETAILS) {
+  return defineCatalogEntry(metadata, moduleLoader(factory));
+}
+
+test('defineCatalogEntry publishes an immutable versioned manifest without loading the game', async () => {
+  let loads = 0;
+  const entry = defineCatalogEntry(DETAILS, async () => {
+    loads += 1;
+    return { default: () => makeCartridge() };
+  });
+
+  // The point of the whole boundary: a rack of thirty entries costs thirty
+  // manifests and zero game modules.
+  assert.equal(loads, 0);
   assert.deepEqual(entry.manifest, {
     ...DETAILS,
     slug: 'test-cart',
@@ -58,67 +76,96 @@ test('defineCartridge publishes an immutable versioned manifest and creates fres
   assert.ok(Object.isFrozen(entry.manifest));
   assert.ok(Object.isFrozen(entry.manifest.controls));
   assert.ok(Object.isFrozen(entry.manifest.artwork));
-  assert.notEqual(entry.create(), entry.create());
   assert.throws(() => {
     entry.manifest.modes.push('changed');
   }, TypeError);
+
+  const loaded = await entry.load();
+  assert.equal(loads, 1);
+  assert.equal(loaded.manifest, entry.manifest);
+  assert.notEqual(loaded.create(), loaded.create());
 });
 
-test('defineCartridge rejects an invalid probe or a later invalid instance', () => {
-  assert.throws(() => defineCartridge(() => makeCartridge({ title: '' }), DETAILS), /title must be a non-empty string/);
-  assert.throws(() => defineCartridge(() => makeCartridge({ draw: null }), DETAILS), /draw must be a function/);
+test('defineCatalogEntry rejects a loader that is not a function', () => {
+  assert.throws(() => defineCatalogEntry(DETAILS, null), /Cartridge loader must be a function/);
+});
+
+test('a module is validated on load and on every later instance', async () => {
+  await assert.rejects(
+    defineTestEntry(() => makeCartridge({ title: '' })).load(),
+    /title must be a non-empty string/,
+  );
+  await assert.rejects(
+    defineTestEntry(() => makeCartridge({ draw: null })).load(),
+    /draw must be a function/,
+  );
+  await assert.rejects(
+    defineCatalogEntry(DETAILS, async () => ({ createTestCart: () => makeCartridge() })).load(),
+    /module must default-export a cartridge factory/,
+  );
 
   let calls = 0;
-  const entry = defineCartridge(() => {
+  const loaded = await defineTestEntry(() => {
     calls += 1;
     return calls === 1 ? makeCartridge() : makeCartridge({ destroy: undefined });
-  }, DETAILS);
-  assert.throws(() => entry.create(), /destroy must be a function/);
+  }).load();
+  assert.throws(() => loaded.create(), /destroy must be a function/);
 });
 
-test('activateCartridge initialises a fresh instance and returns it', () => {
+test('activateCartridge initialises a fresh instance and returns it', async () => {
   const context = { highScore: 42 };
   let received = null;
-  const entry = defineCartridge(() => makeCartridge({ init: (ctx) => { received = ctx; } }), DETAILS);
+  const loaded = await defineTestEntry(
+    () => makeCartridge({ init: (ctx) => { received = ctx; } }),
+  ).load();
 
-  const cartridge = activateCartridge(entry, context);
+  const cartridge = activateCartridge(loaded, context);
 
   assert.equal(received, context);
   assert.equal(cartridge.id, 'test-cart');
 });
 
-test('activateCartridge destroys a partially initialised cartridge and rethrows its init error', () => {
+test('activateCartridge destroys a partially initialised cartridge and rethrows its init error', async () => {
   const boom = new Error('init failed');
   let destroyed = 0;
-  const entry = defineCartridge(() => makeCartridge({
+  const loaded = await defineTestEntry(() => makeCartridge({
     init() { throw boom; },
     destroy() { destroyed += 1; throw new Error('cleanup failed'); },
-  }), DETAILS);
+  })).load();
 
-  assert.throws(() => activateCartridge(entry, {}), (error) => error === boom);
+  assert.throws(() => activateCartridge(loaded, {}), (error) => error === boom);
   assert.equal(destroyed, 1);
 });
 
-test('validateCatalog accepts unique entries and rejects malformed or duplicate versions', () => {
-  const first = defineCartridge(() => makeCartridge(), DETAILS);
-  const second = defineCartridge(() => makeCartridge({ id: 'second-cart' }), {
-    ...DETAILS,
-    slug: 'second-cart',
-  });
+test('activateCartridge refuses a catalog entry that has not been loaded', () => {
+  // The two halves of the contract are not interchangeable: an entry is a
+  // declaration, and only a loaded cartridge can be run.
+  assert.throws(() => activateCartridge(defineTestEntry(), {}), /entry was not validated/);
+});
+
+test('validateCatalog accepts unique entries and rejects malformed or duplicate versions', async () => {
+  const first = defineTestEntry();
+  const second = defineCatalogEntry(
+    { ...DETAILS, slug: 'second-cart' },
+    moduleLoader(() => makeCartridge({ id: 'second-cart' })),
+  );
 
   assert.deepEqual(validateCatalog([first, second]), [first, second]);
   assert.throws(() => validateCatalog([first, first]), /Duplicate cartridge version: test-cart@1\.0\.0/);
   assert.throws(
-    () => validateCatalog([{ id: 'fake', manifest: first.manifest, create() {} }]),
+    () => validateCatalog([{ id: 'fake', manifest: first.manifest, load() {} }]),
     /entry was not validated/,
   );
+  // A loaded cartridge is not a catalog entry either.
+  const loaded = await first.load();
+  assert.throws(() => validateCatalog([loaded]), /entry was not validated/);
 });
 
 test('manifest validation rejects missing or malformed required metadata', () => {
-  const valid = defineCartridge(() => makeCartridge(), DETAILS).manifest;
+  const valid = defineTestEntry().manifest;
 
   assert.throws(
-    () => defineCartridge(() => makeCartridge()),
+    () => defineTestEntry(() => makeCartridge(), {}),
     /manifest\.schemaVersion must be a data property/,
   );
   assert.throws(() => validateManifest({ ...valid, goal: '' }), /goal must be a non-empty string/);
@@ -174,7 +221,7 @@ test('manifest validation rejects missing or malformed required metadata', () =>
   }
 });
 
-test('activateCartridge rejects invalid, suspended, and unsupported runtime entries before creation', () => {
+test('the launch gate refuses blocked entries before their module is ever fetched', async () => {
   let invalidCreates = 0;
   const invalid = {
     manifest: { releaseStatus: 'published' },
@@ -186,47 +233,104 @@ test('activateCartridge rejects invalid, suspended, and unsupported runtime entr
   assert.throws(() => activateCartridge(invalid, {}), /entry was not validated/);
   assert.equal(invalidCreates, 0);
 
-  let suspendedCreates = 0;
-  const suspended = defineCartridge(() => {
-    suspendedCreates += 1;
-    return makeCartridge();
-  }, { ...DETAILS, releaseStatus: 'suspended' });
-  // Never executed: a cartridge the gate would refuse must not run its factory
-  // just because it was defined. A gate that fires after the code already ran
-  // is not a gate.
-  assert.equal(suspendedCreates, 0);
-  assert.throws(() => activateCartridge(suspended, {}), /launch blocked: suspended/);
-  assert.equal(suspendedCreates, 0);
+  // Fetching a module means evaluating it, so for a lazily loaded cartridge
+  // the import IS the launch. The counter is on the LOADER, not the factory:
+  // with lazy loading a factory that never ran proves nothing, but a module
+  // that was never even requested proves the gate fired first.
+  const countedEntry = (metadata) => {
+    const counter = { loads: 0 };
+    counter.entry = defineCatalogEntry(metadata, async () => {
+      counter.loads += 1;
+      return { default: () => makeCartridge() };
+    });
+    return counter;
+  };
 
-  let isolatedCreates = 0;
-  const isolated = defineCartridge(() => {
-    isolatedCreates += 1;
-    return makeCartridge();
-  }, { ...DETAILS, runtime: 'first-party-3d' });
-  assert.equal(isolatedCreates, 0);
-  assert.throws(() => activateCartridge(isolated, {}), /runtime unavailable: first-party-3d/);
-  assert.equal(isolatedCreates, 0);
+  const suspended = countedEntry({ ...DETAILS, releaseStatus: 'suspended' });
+  assert.equal(suspended.loads, 0);
+  await assert.rejects(suspended.entry.load(), /launch blocked: suspended/);
+  assert.equal(suspended.loads, 0);
+
+  const isolated = countedEntry({ ...DETAILS, runtime: 'first-party-3d' });
+  assert.equal(isolated.loads, 0);
+  await assert.rejects(isolated.entry.load(), /runtime unavailable: first-party-3d/);
+  assert.equal(isolated.loads, 0);
 
   // The case that matters once community cartridges exist: untrusted code must
-  // not execute on the platform origin at catalog-definition time.
-  let communityCreates = 0;
-  const community = defineCartridge(() => {
-    communityCreates += 1;
-    return makeCartridge();
-  }, { ...DETAILS, runtime: 'community-iframe', trustLevel: 'untrusted-community' });
-  assert.equal(communityCreates, 0);
-  assert.throws(() => activateCartridge(community, {}), /runtime unavailable: community-iframe/);
-  assert.equal(communityCreates, 0);
+  // never be fetched onto — let alone evaluated on — the platform origin.
+  const community = countedEntry({
+    ...DETAILS,
+    runtime: 'community-iframe',
+    trustLevel: 'untrusted-community',
+  });
+  assert.equal(community.loads, 0);
+  await assert.rejects(community.entry.load(), /runtime unavailable: community-iframe/);
+  assert.equal(community.loads, 0);
 });
 
-test('fresh instances must retain the manifest identity established by the probe', () => {
+test('fresh instances must retain the manifest identity established at load', async () => {
   let calls = 0;
-  const entry = defineCartridge(() => {
+  const loaded = await defineTestEntry(() => {
     calls += 1;
     return calls === 1 ? makeCartridge() : makeCartridge({ id: 'different-cart' });
-  }, DETAILS);
+  }).load();
 
-  assert.throws(() => activateCartridge(entry, {}), /id must match manifest slug: test-cart/);
+  assert.throws(() => activateCartridge(loaded, {}), /id must match manifest slug: test-cart/);
+});
+
+// --- The loading boundary --------------------------------------------------
+
+test('two launches during a load share one fetch, and a loaded game is not refetched', async () => {
+  let loads = 0;
+  let release;
+  const entry = defineCatalogEntry(DETAILS, () => {
+    loads += 1;
+    return new Promise((resolve) => {
+      release = () => resolve({ default: () => makeCartridge() });
+    });
+  });
+
+  // The double-launch guard: a player tapping twice on the loading screen must
+  // not start a second download, let alone a second run.
+  const first = entry.load();
+  const second = entry.load();
+  assert.equal(loads, 1);
+  release();
+  assert.equal(await first, await second);
+
+  await entry.load();
+  assert.equal(loads, 1);
+});
+
+test('a failed load is retryable, and the retry is a real second attempt', async () => {
+  const attempts = [];
+  const entry = defineCatalogEntry(DETAILS, async (attempt) => {
+    attempts.push(attempt);
+    if (attempt === 0) throw new Error('Failed to fetch dynamically imported module');
+    return { default: () => makeCartridge() };
+  });
+
+  await assert.rejects(entry.load(), /Failed to fetch dynamically imported module/);
+  // A rejected load must not be memoised, or the retry button would replay the
+  // failure forever without touching the network.
+  const loaded = await entry.load();
+  assert.deepEqual(attempts, [0, 1]);
+  assert.equal(activateCartridge(loaded, {}).id, 'test-cart');
+});
+
+test('lazyModule resolves relative to the declaring module and reports a missing one', async () => {
+  const entry = defineCatalogEntry(
+    { ...DETAILS, slug: 'pong', title: 'PONG', summary: 'First to 7. Ball speeds up every rally.' },
+    lazyModule('../games/pong/pong.js', import.meta.url),
+  );
+  const loaded = await entry.load();
+  assert.equal(loaded.create().id, 'pong');
+
+  const missing = defineCatalogEntry(
+    DETAILS,
+    lazyModule('../games/no-such-game/no-such-game.js', import.meta.url),
+  );
+  await assert.rejects(missing.load());
 });
 
 // Regression tests for the F-002 hardening pass. Each one corresponds to a
@@ -242,7 +346,7 @@ test('a manifest value that changes between reads cannot be validated as one val
     },
   };
   assert.throws(
-    () => defineCartridge(() => makeCartridge(), { ...DETAILS, artwork: shifty }),
+    () => defineTestEntry(() => makeCartridge(), { ...DETAILS, artwork: shifty }),
     /artwork/,
   );
 });
@@ -274,13 +378,13 @@ test('an exotic array cannot validate as a list and then be stored as a plain ob
     }
   }
   const tags = Sneaky.from(['a', 'b']);
-  const entry = defineCartridge(() => makeCartridge(), { ...DETAILS, tags });
+  const entry = defineTestEntry(() => makeCartridge(), { ...DETAILS, tags });
   assert.ok(Array.isArray(entry.manifest.tags), 'tags must remain a real array');
   assert.deepEqual([...entry.manifest.tags], ['a', 'b']);
 });
 
 test('validateCatalog returns a frozen snapshot, so no entry can be appended after validation', () => {
-  const entry = defineCartridge(() => makeCartridge(), DETAILS);
+  const entry = defineTestEntry();
   const source = [entry];
   const catalog = validateCatalog(source);
 
@@ -291,9 +395,9 @@ test('validateCatalog returns a frozen snapshot, so no entry can be appended aft
   assert.equal(catalog.length, 1);
 });
 
-test('the declared manifest is authoritative and a mismatched instance is refused', () => {
-  assert.throws(
-    () => defineCartridge(() => makeCartridge({ id: 'not-the-declared-slug' }), DETAILS),
+test('the declared manifest is authoritative and a mismatched module is refused', async () => {
+  await assert.rejects(
+    defineTestEntry(() => makeCartridge({ id: 'not-the-declared-slug' })).load(),
     /id must match manifest slug: test-cart/,
   );
 });

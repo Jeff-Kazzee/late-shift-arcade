@@ -8,7 +8,7 @@ import {
   startLevel,
   step,
   terrainHeight,
-} from '../games/lunar-descent/logic.js';
+} from './logic.js';
 
 const rng = () => 0.5;
 const near = (actual, expected, tolerance = 1e-7) => Math.abs(actual - expected) <= tolerance;
