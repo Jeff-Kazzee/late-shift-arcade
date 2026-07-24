@@ -15,9 +15,9 @@ session, with hypnogram evidence cited.
 
 | Operator | Fielded | Won | Notes |
 | --- | --- | --- | --- |
-| Condensation | 0 | 0 | — |
-| Displacement | 0 | 0 | — |
-| Day-residue | 0 | 0 | — |
-| Negation-blindness | 0 | 0 | — |
+| Condensation | 1 | 0 | assist: pause-as-stopped-clock fused into s2026-07-23 winner (hypnogram 3–4) |
+| Displacement | 1 | 0 | produced the named runner-up (route table) |
+| Day-residue | 1 | 0 | over-engineered (signal DAG); killed in revision |
+| Negation-blindness | 1 | 1 | won burst #1: screens-yield-successor shell architecture |
 | Nightmare | 0 | 0 | — |
 | Lucidity | 0 | 0 | — |
