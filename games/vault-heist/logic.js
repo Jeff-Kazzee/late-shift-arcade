@@ -26,9 +26,15 @@ export function mulberry32(seed) {
 }
 
 export const CFG = Object.freeze({
-  TURN_LIMIT: 16,
-  LOCKDOWN_TURNS: 5,
-  CAMERA_EMP_TURNS: 3,
+  // The shift clock is a backstop, not the balance. Turns already cost 2,000
+  // each, so slack play loses on the board long before it runs out of night.
+  TURN_LIMIT: 24,
+  // Long enough that going loud is a decision rather than a death sentence:
+  // eight turns is the vault-to-alley round trip with nothing to spare.
+  LOCKDOWN_TURNS: 8,
+  // Four turns is exactly a doorstep EMP, the walk in, and both drill turns —
+  // enough to get into the vault, never enough to get back out with it.
+  CAMERA_EMP_TURNS: 4,
   LIGHTS_OUT_TURNS: 3,
   DRILL_TURNS: 2,
   SCORE_PER_LOOT: 10,
@@ -58,10 +64,17 @@ export const ROOMS = Object.freeze([
   { id: 'hallw', name: 'HALL W', col: 1, row: 1, cover: false },
   { id: 'atrium', name: 'ATRIUM', col: 2, row: 1, cover: false },
   { id: 'halle', name: 'HALL E', col: 3, row: 1, cover: false },
-  { id: 'security', name: 'SECURITY', col: 4, row: 1, cover: false, console: 'cameras' },
+  { id: 'security', name: 'SECURITY', col: 4, row: 1, cover: false },
   { id: 'landing', name: 'LANDING', col: 5, row: 1, cover: true },
-  { id: 'server', name: 'SERVER', col: 1, row: 2, cover: true },
-  { id: 'lobby', name: 'LOBBY', col: 2, row: 2, cover: false },
+  // The recorder sits one door off the vault approach on purpose. Buried at
+  // the far end of the building it was scenery — nobody could ever reach it,
+  // so the EMP was the only answer to the lenses and there was no second plan.
+  { id: 'server', name: 'SERVER', col: 1, row: 2, cover: true, console: 'cameras' },
+  // The vault lobby has cover so a driller can go still between turns on the
+  // door. Without it, two drill turns cost ten, because WARDEN walks through
+  // and there is nowhere to be. Drilling still exposes you — HIDE does no
+  // work — so the rhythm is drill, freeze, let him pass, drill.
+  { id: 'lobby', name: 'LOBBY', col: 2, row: 2, cover: true },
   { id: 'vault', name: 'VAULT', col: 3, row: 2, cover: true },
   { id: 'maint', name: 'MAINT', col: 4, row: 2, cover: true, console: 'lights' },
 ]);
@@ -214,10 +227,20 @@ export const CREW_TEMPLATES = Object.freeze([
 // room it will step into next — own room plus one, never a whole cone. Six
 // watched rooms out of sixteen leaves the building navigable while making
 // every corridor a timing problem.
+// Loop lengths are the difficulty dial. A four-stop loop leaves its rooms hot
+// half the time, which turned the only corridors into a wall; six and eight
+// stops leave the same rooms genuinely cold for stretches you can plan inside.
 export const GUARD_TEMPLATES = Object.freeze([
-  { id: 'g1', name: 'ROVER', route: ['hallw', 'atrium', 'halle', 'atrium'] },
-  { id: 'g2', name: 'WARDEN', route: ['lobby', 'atrium', 'archive', 'gallery', 'halle', 'atrium'] },
-  { id: 'g3', name: 'DESK', route: ['security', 'office', 'security', 'maint'] },
+  { id: 'g1', name: 'ROVER', route: ['hallw', 'atrium', 'halle', 'security', 'halle', 'atrium'] },
+  {
+    id: 'g2',
+    name: 'WARDEN',
+    route: ['lobby', 'server', 'hallw', 'loading', 'archive', 'gallery', 'halle', 'atrium'],
+  },
+  // DESK's loop deliberately leaves SECURITY unwatched for two straight turns
+  // in six. A console nobody can ever reach is not a second plan, it is
+  // scenery, and the recorder has to be a real alternative to the EMP.
+  { id: 'g3', name: 'DESK', route: ['security', 'office', 'stair', 'landing', 'security', 'maint'] },
 ]);
 
 const NOISE = Object.freeze({ drill: 3, grab: 2, hack: 2, charge: 5, noisemaker: 4, force: 3 });
@@ -561,7 +584,18 @@ export function projectTurn(state, orders = {}) {
   for (const crew of crewAfter) {
     if (crew.captured || crew.extracted) continue;
     for (const guard of guardMoves) {
-      const caught = guard.to === crew.room || (guard.watches.includes(crew.room) && !crew.hiding);
+      // Going still in a room with cover hides you even from a guard who walks
+      // in. Every room in this building is on somebody's loop, so without
+      // that there is nowhere to wait out a patrol and the plan degenerates
+      // into a race you cannot win. The cost is the turn itself: HIDE does no
+      // work, and turns are 2,000 points each.
+      //
+      // The corridors — HALL W, ATRIUM, HALL E, LOBBY, SECURITY — have no
+      // cover, so the risk sits exactly where the route and the vault door
+      // are, which is where it belongs.
+      const caught = crew.hiding
+        ? false
+        : guard.to === crew.room || guard.watches.includes(crew.room);
       if (caught) {
         detections.push({ crew: crew.id, name: crew.name, by: 'guard', who: guard.name, room: crew.room });
         break;
@@ -592,31 +626,47 @@ export function projectTurn(state, orders = {}) {
     }
     events.push(`${crew.name} taken in ${room(caught.room).name}`);
   }
+  // A camera can only tell them once. After the alarm is ringing the lenses
+  // stop mattering and the heist becomes a race, which is the whole shape of
+  // the back half: quiet phase, then loud phase, and you choose when to cross.
   if (spotted.length > 0) {
-    next.alarms += 1;
-    events.push(`a camera has you in ${room(spotted[0].room).name}`);
+    if (next.alarms === 0) {
+      next.alarms += 1;
+      events.push(`a camera has you in ${room(spotted[0].room).name}`);
+    } else {
+      events.push('the lenses track you, for what it is worth now');
+    }
   }
 
   // 4. Noise redirects patrols — from next turn, which is why the overlay can
   //    promise this turn exactly and still leave you something to worry about.
+  // One guard answers a sound; the rest keep walking their loop. Sending the
+  // whole shift at every clatter turned patrols into a single moving wall
+  // that could corner a carrier with nowhere legal to stand — and a wall is
+  // not a puzzle. Nearest guard goes, ties broken by roster order.
   const alerted = [];
-  for (const guard of guardMoves) {
-    let pick = null;
-    for (const noise of noises) {
-      if (noise.magnitude <= 0) continue;
-      const radius = Math.max(0, noise.magnitude - 1);
-      if (hops({ ...state, ...next }, guard.to, noise.room) > radius) continue;
-      if (
-        pick === null ||
-        noise.magnitude > pick.magnitude ||
-        (noise.magnitude === pick.magnitude && roomIndex(noise.room) < roomIndex(pick.room))
-      ) {
-        pick = noise;
+  const after = { ...state, ...next };
+  const ordered = [...noises]
+    .filter((n) => n.magnitude > 0)
+    .sort((a, b) => b.magnitude - a.magnitude || roomIndex(a.room) - roomIndex(b.room));
+  const taken = [];
+  for (const noise of ordered) {
+    const radius = Math.max(0, noise.magnitude - 1);
+    let chosen = null;
+    let chosenHops = Infinity;
+    for (const guard of guardMoves) {
+      if (taken.includes(guard.id) || guard.to === noise.room) continue;
+      const distance = hops(after, guard.to, noise.room);
+      if (distance > radius) continue;
+      if (distance < chosenHops) {
+        chosenHops = distance;
+        chosen = guard;
       }
     }
-    if (pick !== null && pick.room !== guard.to) {
-      guard.moved = { ...guard.moved, alertTo: pick.room, pause: 0 };
-      alerted.push({ id: guard.id, to: pick.room });
+    if (chosen !== null) {
+      taken.push(chosen.id);
+      chosen.moved = { ...chosen.moved, alertTo: noise.room, pause: 0 };
+      alerted.push({ id: chosen.id, to: noise.room });
     }
   }
 
