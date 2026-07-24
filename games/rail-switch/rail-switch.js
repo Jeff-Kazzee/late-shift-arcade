@@ -31,12 +31,12 @@ const FIELD = { x: 6, y: 70, w: 628, h: 320 };
 const PLAN_VIEW = { k: 1.35, fx: 300, fy: 236 };
 // How far above its node a switch's indicator box sits, clear of the rails.
 const SWITCH_LIFT = -34;
-// A junction's tap target: 64 x 72 canvas units covering both the points and
-// the lifted indicator, well over the cabinet's MIN_TOUCH_TARGET of 44. The
-// three junctions are 176 and 290 units apart, so the generous box costs
-// nothing — and a phone thumb needs it, since the cabinet scales its glass to
-// roughly 0.56 on a portrait handset.
-const hitBox = (node) => ({ x: node.x - 32, y: node.y + SWITCH_LIFT - 22, w: 64, h: 72 });
+// A junction's tap target, covering both the points and the lifted indicator.
+// 80 square is not decoration: the cabinet scales its 640x480 glass to about
+// 0.56 on a portrait handset, so 80 canvas units is what it takes to land on
+// 44 CSS px under a thumb. The three junctions are 176 and 290 units apart, so
+// the boxes still cannot touch each other.
+const hitBox = (node) => ({ x: node.x - 40, y: node.y - 52, w: 80, h: 80 });
 const END_HOLD = 1.7; // seconds the live board stays up before the score card
 
 // 150 x 68 canvas units each — the cabinet scales its 640x480 glass down to
