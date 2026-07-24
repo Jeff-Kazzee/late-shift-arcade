@@ -10,6 +10,7 @@ import { createGalaxyRaid } from './galaxy-raid/galaxy-raid.js';
 import { createNeonSnake } from './neon-snake/neon-snake.js';
 import { createLunarDescent } from './lunar-descent/lunar-descent.js';
 import { createMidnightRun } from './midnight-run/midnight-run.js';
+import { createOrbitalSalvage } from './orbital-salvage/orbital-salvage.js';
 
 const legacyMetadata = (fields) => ({
   schemaVersion: 1,
@@ -99,5 +100,14 @@ export const cartridges = Object.freeze(validateCatalog([
     genre: 'RACER', players: '1',
     controls: ['STEER', 'DRAG'], artwork: { accent: 'rose' },
     tags: ['speed', 'combo'],
+  })),
+  defineCartridge(createOrbitalSalvage, legacyMetadata({
+    slug: 'orbital-salvage', title: 'ORBITAL SALVAGE',
+    summary: 'Every wreck you tether rewrites the route home.',
+    modes: ['solo'],
+    goal: 'Tether 400 credits of wreckage and dock before fuel, hull, or orbit gives out.',
+    genre: 'PHYSICS', players: '1',
+    controls: ['DRAG-BURN', 'TETHER'], artwork: { accent: 'periwinkle' },
+    tags: ['physics', 'planning'],
   })),
 ]));
