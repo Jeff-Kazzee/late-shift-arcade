@@ -15,6 +15,17 @@ Handoff files live outside the repository, one per stream, named
 date-stamp the filename — a handoff is current truth that gets overwritten, not
 an archive. See `EXECUTION-PLAN.md` for the stream list.
 
+## Branches and release
+
+`dev` is where all work lands. Branch `feat/*` off `dev` and return through a
+pull request. CI runs the suite on every pull request and every merge.
+
+**`prod` is frozen and is not yours to move.** It holds the publicly deployed
+site, and it advances only when Jeff explicitly decides to make a release live.
+Do not merge, push, fast-forward, or open a pull request into `prod`, and do not
+treat a green suite or a finished ticket as permission to. The site going public
+is a product decision, not a build step.
+
 ## Platform charter
 
 Late Shift Arcade is a curated compendium of small, complete, AI-made browser

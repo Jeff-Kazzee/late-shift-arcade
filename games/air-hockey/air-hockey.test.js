@@ -7,7 +7,7 @@ import {
   setMallet,
   cpuTarget,
   inGoalMouth,
-} from '../games/air-hockey/logic.js';
+} from './logic.js';
 
 function liveGame() {
   const state = newGame();

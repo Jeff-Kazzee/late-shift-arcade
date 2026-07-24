@@ -16,7 +16,7 @@ import {
   toggleTether,
   totalMass,
   wreckPosition,
-} from '../games/orbital-salvage/logic.js';
+} from './logic.js';
 
 // A state with the tug parked on a clean circular orbit far from every
 // authored hazard so individual rules can be exercised in isolation.

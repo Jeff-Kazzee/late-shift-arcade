@@ -1,5 +1,14 @@
-// Cartridge contract shared by the cabinet and its rack. Each entry combines
-// one serializable manifest with the private capability to create a fresh game.
+// Cartridge contract shared by the cabinet and its rack.
+//
+// The contract has two halves, and keeping them apart is the whole point:
+//
+//   catalog entry   manifest (data) + the capability to FETCH the game later
+//   loaded cartridge   the fetched factory + the capability to CREATE a game
+//
+// The cabinet builds its catalog from entries, so it can render a card for
+// every game in the rack without downloading — let alone running — a single
+// game. Code arrives only when a player launches, and only after the launch
+// gate has cleared the manifest that declared it.
 
 import { palette } from './palette.js';
 
@@ -8,7 +17,11 @@ const MANIFEST_SCHEMA_VERSION = 1;
 const RUNTIMES = new Set(['first-party-2d', 'first-party-3d', 'community-iframe']);
 const TRUST_LEVELS = new Set(['trusted-first-party', 'untrusted-community']);
 const RELEASE_STATUSES = new Set(['published', 'suspended']);
-const validatedEntries = new WeakSet();
+// Two separate marks, so the halves of the contract cannot be swapped: an
+// entry that has not been loaded cannot be handed to activateCartridge, and a
+// loaded cartridge cannot be smuggled into a catalog in place of its entry.
+const catalogEntries = new WeakSet();
+const loadedCartridges = new WeakSet();
 const MANIFEST_FIELDS = new Set([
   'schemaVersion',
   'slug',
@@ -199,47 +212,92 @@ function immutableCopy(value) {
   return value;
 }
 
-// Define once, probe now, and create a fresh validated instance on every run.
+// Turn a fetched module into the launchable half of the contract.
+//
+// The declared manifest is authoritative and the module must MATCH it. An
+// earlier version took slug/title/summary from the executed instance, so
+// declared metadata was silently replaced by whatever the code returned —
+// meaning a reviewer could approve one identity and the catalog ship another.
+// The first instance is the probe: a module that does not present its declared
+// identity is refused here, on the loading screen, rather than mid-launch.
+function loadCartridge(module, manifest) {
+  const factory = module?.default;
+  if (typeof factory !== 'function') fail('module must default-export a cartridge factory');
+
+  assertDeclaredIdentity(validateInstance(factory()), manifest);
+
+  const create = () => assertDeclaredIdentity(validateInstance(factory()), manifest);
+  const loaded = Object.freeze({ id: manifest.slug, manifest, create });
+  loadedCartridges.add(loaded);
+  return loaded;
+}
+
+// Declare a game without containing one. The manifest is validated now; the
+// loader is not called until load(), and load() asks the launch gate first.
 //
 // Two ordering rules carry the trust model, and both are load-bearing rather
 // than stylistic:
 //
-// 1. The declared manifest is validated BEFORE the factory is called, and the
-//    factory is called only for the in-process runtime. Cartridge classes that
-//    are not permitted to execute on the platform origin must not run merely
-//    because someone put them in a catalog. A launch gate that fires after the
-//    code already ran is not a gate.
-// 2. The declared manifest is authoritative and the probe must MATCH it. The
-//    old order took slug/title/summary from the executed instance, so declared
-//    metadata was silently replaced by whatever the code returned — meaning a
-//    reviewer could approve one identity and the catalog could ship another.
-export function defineCartridge(factory, metadata = {}) {
-  if (typeof factory !== 'function') throw new TypeError('Cartridge factory must be a function');
+// 1. The gate runs BEFORE the loader. Evaluating a module *is* executing it,
+//    so for a lazily fetched cartridge the import is the launch. Anything the
+//    gate would refuse — suspended, or a runtime this origin may not host — is
+//    never even downloaded. A gate that fires after the code already ran is
+//    not a gate.
+// 2. Nothing about a game runs at catalog-build time at all. A rack of thirty
+//    entries costs thirty manifests and zero game modules.
+export function defineCatalogEntry(manifest, loader) {
+  if (typeof loader !== 'function') throw new TypeError('Cartridge loader must be a function');
 
   // Validate the caller's object to reject bad input loudly, then validate the
   // frozen copy that is actually stored. A Proxy or getter that answers
   // differently on a second read fails the second pass instead of validating
   // as one value and being served as another.
-  validateManifest(metadata);
-  const manifest = immutableCopy(metadata);
   validateManifest(manifest);
+  const declared = immutableCopy(manifest);
+  validateManifest(declared);
 
-  // Probe only what could actually launch. Anything the gate would refuse is
-  // never executed here, so a suspended or non-in-process cartridge cannot run
-  // code merely by appearing in a catalog. Entries that skip the probe are
-  // still identity-checked by create() if they ever become launchable.
-  if (launchBlockReason(manifest) === null) {
-    assertDeclaredIdentity(validateInstance(factory()), manifest);
-  }
+  let pending = null;
+  let attempts = 0;
 
-  const create = () => assertDeclaredIdentity(validateInstance(factory()), manifest);
-  const entry = Object.freeze({
-    id: manifest.slug,
-    manifest,
-    create,
-  });
-  validatedEntries.add(entry);
+  const load = () => {
+    const blocked = launchBlockReason(declared);
+    if (blocked) {
+      return Promise.reject(new TypeError(`Cartridge launch blocked: ${blocked}`));
+    }
+    // Memoised, so two taps during the loading screen share one fetch and a
+    // second launch of the same game is free. A failure clears the slot: a
+    // retry has to be a real second attempt, not a replay of the rejection.
+    if (pending === null) {
+      const attempt = attempts;
+      attempts += 1;
+      // The loader is called synchronously — load() starts the fetch, it does
+      // not merely promise to. A loader that throws outright still becomes a
+      // rejection rather than escaping into the caller's frame.
+      const fetching = (async () => loadCartridge(await loader(attempt), declared))();
+      pending = fetching.catch((error) => {
+        pending = null;
+        throw error;
+      });
+    }
+    return pending;
+  };
+
+  const entry = Object.freeze({ id: declared.slug, manifest: declared, load });
+  catalogEntries.add(entry);
   return entry;
+}
+
+// The standard loader: fetch a cartridge module relative to the file that
+// declared it, so one registry line works from `/` and from a project subpath
+// like `/late-shift-arcade/` without a build step or an import map.
+//
+// The attempt counter is not decoration. A dynamic import that fails is
+// remembered by the page's module map, so retrying the same specifier can
+// re-reject instantly without touching the network. A retry therefore has to
+// ask for a URL this page has not already given up on.
+export function lazyModule(specifier, baseUrl) {
+  const href = new URL(specifier, baseUrl).href;
+  return (attempt = 0) => import(attempt === 0 ? href : `${href}?retry=${attempt}`);
 }
 
 // The single source of truth for "may this entry launch?". Returns null when
@@ -258,14 +316,19 @@ export function launchBlockReason(manifest) {
 
 // Initialise as a transaction: a partially initialised cartridge is cleaned
 // up before the original init error reaches the cabinet fault screen.
-export function activateCartridge(entry, context) {
-  if (entry === null || typeof entry !== 'object' || !validatedEntries.has(entry)) {
+//
+// Takes a LOADED cartridge, not a catalog entry, and stays synchronous. The
+// cabinet restarts a run by activating again mid-session; that path must not
+// have to await anything. The gate is re-asked here anyway — the module was
+// cleared to load, and is cleared again to run.
+export function activateCartridge(loaded, context) {
+  if (loaded === null || typeof loaded !== 'object' || !loadedCartridges.has(loaded)) {
     throw new TypeError('Invalid cartridge entry: entry was not validated');
   }
-  const blocked = launchBlockReason(entry.manifest);
+  const blocked = launchBlockReason(loaded.manifest);
   if (blocked) throw new TypeError(`Cartridge launch blocked: ${blocked}`);
 
-  const cartridge = entry.create();
+  const cartridge = loaded.create();
   try {
     cartridge.init(context);
   } catch (error) {
@@ -288,7 +351,7 @@ export function validateCatalog(entries) {
   const catalog = Object.freeze(Array.from(entries));
   const identities = new Set();
   for (const entry of catalog) {
-    if (entry === null || typeof entry !== 'object' || !validatedEntries.has(entry)) {
+    if (entry === null || typeof entry !== 'object' || !catalogEntries.has(entry)) {
       throw new TypeError('Invalid cartridge entry: entry was not validated');
     }
     const identity = `${entry.manifest.slug}@${entry.manifest.version}`;
