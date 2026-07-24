@@ -1,9 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { activateCartridge, defineCartridge, validateCatalog } from '../shell/cartridge.js';
+import {
+  activateCartridge,
+  defineCartridge,
+  validateCatalog,
+  validateManifest,
+} from '../shell/cartridge.js';
 
 const DETAILS = {
-  genre: 'TEST', controls: ['MOVE'], players: '1', accent: 'amber', tags: [],
+  schemaVersion: 1,
+  version: '1.0.0',
+  creator: 'Late Shift Arcade',
+  runtime: 'first-party-2d',
+  trustLevel: 'trusted-first-party',
+  modes: ['solo'],
+  goal: 'Complete the cartridge contract.',
+  scoreLabel: 'POINTS',
+  controls: ['MOVE'],
+  artwork: { accent: 'amber' },
+  releaseStatus: 'published',
+  contentNotes: ['Abstract arcade action.'],
+  madeWith: 'AI-assisted design, code, art, audio, and testing.',
+  source: 'https://example.com/test-cart',
+  genre: 'TEST',
+  players: '1',
+  tags: [],
 };
 
 function makeCartridge(overrides = {}) {
@@ -19,25 +40,22 @@ function makeCartridge(overrides = {}) {
   };
 }
 
-test('defineCartridge publishes immutable metadata and creates fresh valid instances', () => {
-  const entry = defineCartridge(
-    () => makeCartridge(),
-    { genre: 'shooter', controls: ['arrows', 'tap'], players: '1', accent: 'amber', tags: ['arcade'] },
-  );
+test('defineCartridge publishes an immutable versioned manifest and creates fresh instances', () => {
+  const entry = defineCartridge(() => makeCartridge(), DETAILS);
 
-  assert.deepEqual(entry.details, {
-    genre: 'shooter',
-    controls: ['arrows', 'tap'],
-    players: '1',
-    accent: 'amber',
-    tags: ['arcade'],
+  assert.deepEqual(entry.manifest, {
+    ...DETAILS,
+    slug: 'test-cart',
+    title: 'Test Cart',
+    summary: 'A cartridge for contract tests.',
   });
   assert.ok(Object.isFrozen(entry));
-  assert.ok(Object.isFrozen(entry.details));
-  assert.ok(Object.isFrozen(entry.details.controls));
+  assert.ok(Object.isFrozen(entry.manifest));
+  assert.ok(Object.isFrozen(entry.manifest.controls));
+  assert.ok(Object.isFrozen(entry.manifest.artwork));
   assert.notEqual(entry.create(), entry.create());
   assert.throws(() => {
-    entry.details.tags.push('changed');
+    entry.manifest.modes.push('changed');
   }, TypeError);
 });
 
@@ -76,22 +94,115 @@ test('activateCartridge destroys a partially initialised cartridge and rethrows 
   assert.equal(destroyed, 1);
 });
 
-test('validateCatalog accepts unique entries and rejects duplicate IDs', () => {
+test('validateCatalog accepts unique entries and rejects malformed or duplicate versions', () => {
   const first = defineCartridge(() => makeCartridge(), DETAILS);
   const second = defineCartridge(() => makeCartridge({ id: 'second-cart' }), DETAILS);
 
   assert.deepEqual(validateCatalog([first, second]), [first, second]);
-  assert.throws(() => validateCatalog([first, first]), /Duplicate cartridge id: test-cart/);
+  assert.throws(() => validateCatalog([first, first]), /Duplicate cartridge version: test-cart@1\.0\.0/);
+  assert.throws(
+    () => validateCatalog([{ id: 'fake', manifest: first.manifest, create() {} }]),
+    /entry was not validated/,
+  );
 });
 
-test('defineCartridge rejects missing or malformed selector metadata', () => {
-  assert.throws(() => defineCartridge(() => makeCartridge()), /genre must be a non-empty string/);
+test('manifest validation rejects missing or malformed required metadata', () => {
+  const valid = defineCartridge(() => makeCartridge(), DETAILS).manifest;
+
   assert.throws(
-    () => defineCartridge(() => makeCartridge(), { ...DETAILS, controls: [] }),
+    () => defineCartridge(() => makeCartridge()),
+    /manifest\.schemaVersion must be a data property/,
+  );
+  assert.throws(() => validateManifest({ ...valid, goal: '' }), /goal must be a non-empty string/);
+  assert.throws(
+    () => validateManifest({ ...valid, controls: [] }),
     /controls must be a non-empty array/,
   );
   assert.throws(
-    () => defineCartridge(() => makeCartridge(), { ...DETAILS, tags: [''] }),
-    /tags\[0\] must be a non-empty string/,
+    () => validateManifest({ ...valid, source: 'javascript:alert(1)' }),
+    /source must be an absolute HTTP\(S\) URL/,
   );
+  assert.throws(
+    () => validateManifest({ ...valid, runtime: 'community-iframe' }),
+    /runtime and trustLevel are incompatible/,
+  );
+  assert.throws(
+    () => validateManifest({ ...valid, debug: () => {} }),
+    /manifest has unsupported field: debug/,
+  );
+  assert.throws(
+    () => validateManifest({ ...valid, artwork: { accent: 'amber', image: () => {} } }),
+    /artwork has unsupported field: image/,
+  );
+
+  const accessorArtwork = {};
+  Object.defineProperty(accessorArtwork, 'accent', { enumerable: true, get: () => 'amber' });
+  assert.throws(
+    () => validateManifest({ ...valid, artwork: accessorArtwork }),
+    /artwork\.accent must be a data property/,
+  );
+
+  const accessorControls = [];
+  Object.defineProperty(accessorControls, 0, { enumerable: true, get: () => 'MOVE' });
+  accessorControls.length = 1;
+  assert.throws(
+    () => validateManifest({ ...valid, controls: accessorControls }),
+    /controls\[0\] must be a data property/,
+  );
+
+  Object.defineProperty(Object.prototype, 'madeWith', {
+    configurable: true,
+    value: valid.madeWith,
+  });
+  try {
+    const inheritedMadeWith = { ...valid };
+    delete inheritedMadeWith.madeWith;
+    assert.throws(
+      () => validateManifest(inheritedMadeWith),
+      /manifest\.madeWith must be a data property/,
+    );
+  } finally {
+    delete Object.prototype.madeWith;
+  }
+});
+
+test('activateCartridge rejects invalid, suspended, and unsupported runtime entries before creation', () => {
+  let invalidCreates = 0;
+  const invalid = {
+    manifest: { releaseStatus: 'published' },
+    create() {
+      invalidCreates += 1;
+      return makeCartridge();
+    },
+  };
+  assert.throws(() => activateCartridge(invalid, {}), /entry was not validated/);
+  assert.equal(invalidCreates, 0);
+
+  let suspendedCreates = 0;
+  const suspended = defineCartridge(() => {
+    suspendedCreates += 1;
+    return makeCartridge();
+  }, { ...DETAILS, releaseStatus: 'suspended' });
+  assert.equal(suspendedCreates, 1);
+  assert.throws(() => activateCartridge(suspended, {}), /launch blocked: suspended/);
+  assert.equal(suspendedCreates, 1);
+
+  let isolatedCreates = 0;
+  const isolated = defineCartridge(() => {
+    isolatedCreates += 1;
+    return makeCartridge();
+  }, { ...DETAILS, runtime: 'first-party-3d' });
+  assert.equal(isolatedCreates, 1);
+  assert.throws(() => activateCartridge(isolated, {}), /runtime unavailable: first-party-3d/);
+  assert.equal(isolatedCreates, 1);
+});
+
+test('fresh instances must retain the manifest identity established by the probe', () => {
+  let calls = 0;
+  const entry = defineCartridge(() => {
+    calls += 1;
+    return calls === 1 ? makeCartridge() : makeCartridge({ id: 'different-cart' });
+  }, DETAILS);
+
+  assert.throws(() => activateCartridge(entry, {}), /id must match manifest slug: test-cart/);
 });

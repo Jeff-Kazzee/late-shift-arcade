@@ -11,6 +11,7 @@ import { createTextPainter } from './canvas-text.js';
 import { disposeScreen } from './screen.js';
 import { advance, STEP_MS } from './loop.js';
 import { activateCartridge } from './cartridge.js';
+import { detailUrlFor, resolveCatalogDetail } from './catalog.js';
 import {
   cardsForPage,
   catalogPageControlAt,
@@ -98,6 +99,17 @@ function clear() {
 function compactLabel(value, max = 36) {
   const label = String(value);
   return label.length <= max ? label : `${label.slice(0, max - 1).trimEnd()}…`;
+}
+
+function showDetailUrl(entry) {
+  window.history.pushState({}, '', detailUrlFor(entry.manifest, window.location.href));
+}
+
+function showCabinetUrl() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('game');
+  url.searchParams.delete('version');
+  window.history.replaceState({}, '', url);
 }
 
 // --- Screens -------------------------------------------------------------
@@ -201,7 +213,8 @@ function selectScreen() {
       }
       if (input.pressed('action')) {
         sfx.play('start');
-        return gameScreen(cartridges[index]);
+        showDetailUrl(cartridges[index]);
+        return detailScreen(cartridges[index]);
       }
       if (input.pointer.justDown) {
         const currentPage = pageForIndex(index, cartridges.length);
@@ -228,7 +241,8 @@ function selectScreen() {
         );
         if (hit >= 0) {
           sfx.play('start');
-          return gameScreen(cartridges[hit]);
+          showDetailUrl(cartridges[hit]);
+          return detailScreen(cartridges[hit]);
         }
       }
     },
@@ -259,8 +273,9 @@ function selectScreen() {
 
       for (const r of cardsForPage(cartridges.length, currentPage)) {
         const cart = cartridges[r.index];
+        const manifest = cart.manifest;
         const selected = r.index === index;
-        const accent = palette[cart.details.accent] ?? palette.amber;
+        const accent = palette[manifest.artwork.accent] ?? palette.amber;
         ctx2d.beginPath();
         ctx2d.roundRect(r.x, r.y, r.w, r.h, 8);
         if (selected) {
@@ -273,33 +288,103 @@ function selectScreen() {
         ctx2d.stroke();
         ctx2d.shadowBlur = 0;
 
-        text(cart.title, r.x + 14, r.y + 22, {
+        text(manifest.title, r.x + 14, r.y + 22, {
           align: 'left',
           color: selected ? palette.cream : palette.periwinkle,
           size: 16,
           bold: selected,
         });
-        text(`HI ${topScore(loadScores(cart.id))}`, r.x + r.w - 14, r.y + 21, {
+        text(`HI ${topScore(loadScores(manifest.slug))}`, r.x + r.w - 14, r.y + 21, {
           align: 'right', size: 11, color: accent,
         });
-        text(`${cart.details.genre} · ${cart.details.players}P`, r.x + 14, r.y + 41, {
+        text(`${manifest.genre} · ${manifest.players}P`, r.x + 14, r.y + 41, {
           align: 'left', size: 10, color: accent, bold: true,
         });
-        text(compactLabel(cart.blurb), r.x + 14, r.y + 61, {
+        text(compactLabel(manifest.summary), r.x + 14, r.y + 61, {
           align: 'left',
           size: 10,
           color: palette.rose,
         });
       }
       const selected = cartridges[index];
-      text(`${selected.details.controls.join(' + ')} · SPACE / TAP TO LOAD`, W / 2, H - 18, {
+      text(`${selected.manifest.controls.join(' + ')} · SPACE / TAP FOR DETAILS`, W / 2, H - 18, {
         size: 11, color: palette.rose,
       });
     },
   };
 }
 
+function detailScreen(entry) {
+  const manifest = entry.manifest;
+  const accent = palette[manifest.artwork.accent] ?? palette.amber;
+  const launchable = manifest.releaseStatus === 'published';
+  showEject(true);
+  consumeEject();
+
+  const back = () => {
+    showEject(false);
+    showCabinetUrl();
+    return selectScreen();
+  };
+
+  return {
+    update() {
+      if (input.pressed('eject') || input.pressed('pause') || consumeEject()) {
+        sfx.play('pause');
+        return back();
+      }
+      if (launchable && (input.pressed('action') || input.pointer.justDown)) {
+        sfx.play('start');
+        return gameScreen(entry);
+      }
+    },
+    draw() {
+      clear();
+      text(manifest.title, 44, 58, {
+        align: 'left', size: 26, color: accent, bold: true, glow: 10,
+      });
+      text(`${manifest.genre} · ${manifest.players}P · ${manifest.version}`, W - 44, 56, {
+        align: 'right', size: 11, color: palette.rose,
+      });
+      text(compactLabel(manifest.summary, 76), 44, 98, {
+        align: 'left', size: 13, color: palette.periwinkle,
+      });
+      text('GOAL', 44, 142, {
+        align: 'left', size: 11, color: accent, bold: true,
+      });
+      text(compactLabel(manifest.goal, 76), 44, 166, {
+        align: 'left', size: 13, color: palette.cream,
+      });
+      text(`MODES  ${manifest.modes.join(' · ')}`, 44, 212, {
+        align: 'left', size: 12, color: palette.periwinkle,
+      });
+      text(`CONTROLS  ${manifest.controls.join(' + ')}`, 44, 242, {
+        align: 'left', size: 12, color: palette.periwinkle,
+      });
+      text(`SCORE LABEL  ${manifest.scoreLabel}`, 44, 272, {
+        align: 'left', size: 12, color: palette.periwinkle,
+      });
+      text(`CREATOR  ${manifest.creator}`, 44, 316, {
+        align: 'left', size: 12, color: palette.rose,
+      });
+      text(compactLabel(`MADE WITH  ${manifest.madeWith}`, 76), 44, 346, {
+        align: 'left', size: 11, color: palette.rose,
+      });
+      text(compactLabel(`CONTENT  ${manifest.contentNotes.join(' ')}`, 76), 44, 376, {
+        align: 'left', size: 11, color: palette.rose,
+      });
+      text(
+        launchable ? 'SPACE OR TAP TO PLAY · Q TO CABINET' : 'SUSPENDED · Q TO CABINET',
+        W / 2,
+        438,
+        { size: 14, color: launchable ? accent : palette.rose, bold: true },
+      );
+    },
+  };
+}
+
 function gameScreen(entry) {
+  const manifest = entry.manifest;
   let cart = null;
   let disposed = false;
   let paused = false;
@@ -313,7 +398,7 @@ function gameScreen(entry) {
     height: H,
     palette,
     sfx,
-    highScore: topScore(loadScores(entry.id)),
+    highScore: topScore(loadScores(manifest.slug)),
     shake(power = 5) {
       shakeMag = power;
       shakeT = 0.25;
@@ -321,7 +406,7 @@ function gameScreen(entry) {
     endGame(score) {
       finished = { score: Math.max(0, Math.round(score)) };
       sincefinish = 0;
-      sfx.play(qualifies(loadScores(entry.id), finished.score) ? 'fanfare' : 'lose');
+      sfx.play(qualifies(loadScores(manifest.slug), finished.score) ? 'fanfare' : 'lose');
     },
   };
 
@@ -338,6 +423,7 @@ function gameScreen(entry) {
   const eject = () => {
     dispose();
     sfx.play('pause');
+    showCabinetUrl();
     return selectScreen();
   };
   const restart = () => {
@@ -361,7 +447,7 @@ function gameScreen(entry) {
         sincefinish += dt;
         if (sincefinish < 0.5) return; // debounce the killing blow's input
         if (input.pressed('restart')) return restart();
-        if (qualifies(loadScores(entry.id), finished.score)) {
+        if (qualifies(loadScores(manifest.slug), finished.score)) {
           if (input.pressed('action') || input.pointer.justDown) {
             dispose();
             return initialsScreen(entry, finished.score);
@@ -404,7 +490,7 @@ function gameScreen(entry) {
         ctx2d.fillRect(0, 0, W, H);
         text('GAME OVER', W / 2, H / 2 - 30, { size: 28, color: palette.rose });
         text(`SCORE ${finished.score}`, W / 2, H / 2 + 4, { color: palette.cream });
-        const hint = qualifies(loadScores(entry.id), finished.score)
+        const hint = qualifies(loadScores(manifest.slug), finished.score)
           ? 'NEW HIGH SCORE — tap for initials · R to retry'
           : 'tap or R to restart · Q to eject';
         text(hint, W / 2, H / 2 + 36, { size: 14, color: palette.amber });
@@ -423,7 +509,9 @@ function initialsScreen(cart, score) {
 
   const commit = () => {
     const initials = letters.map((n) => String.fromCharCode(A + n)).join('');
-    saveScores(cart.id, insertScore(loadScores(cart.id), { initials, score }));
+    const slug = cart.manifest.slug;
+    saveScores(slug, insertScore(loadScores(slug), { initials, score }));
+    showCabinetUrl();
     sfx.play('fanfare');
     return selectScreen();
   };
@@ -454,7 +542,7 @@ function initialsScreen(cart, score) {
     draw() {
       clear();
       text('NEW HIGH SCORE', W / 2, 110, { size: 26, color: palette.amber });
-      text(`${cart.title} — ${score}`, W / 2, 150, { color: palette.periwinkle });
+      text(`${cart.manifest.title} — ${score}`, W / 2, 150, { color: palette.periwinkle });
       for (let i = 0; i < 3; i += 1) {
         const ch = String.fromCharCode(A + letters[i]);
         text('▲', slotX(i), slotY - 50, { size: 14, color: palette.deep });
@@ -503,8 +591,13 @@ function faultScreen(err) {
 
 // --- Fixed-timestep loop ---------------------------------------------------
 
-let screen = attractScreen();
-showEject(false);
+const directEntry = resolveCatalogDetail(cartridges, window.location.href);
+let screen = directEntry ? detailScreen(directEntry) : attractScreen();
+showEject(Boolean(directEntry));
+let routeChanged = false;
+window.addEventListener('popstate', () => {
+  routeChanged = true;
+});
 let last = performance.now();
 let accMs = 0;
 
@@ -514,6 +607,14 @@ function frame(now) {
   last = now;
   accMs = r.acc;
   try {
+    if (routeChanged) {
+      routeChanged = false;
+      disposeScreen(screen, (error) => console.error('screen cleanup fault:', error));
+      input.rebase?.();
+      const entry = resolveCatalogDetail(cartridges, window.location.href);
+      screen = entry ? detailScreen(entry) : selectScreen();
+      showEject(Boolean(entry));
+    }
     for (let i = 0; i < r.steps; i += 1) {
       if (input.pressed('m') && !sfx.toggleMute()) sfx.play('click');
       const next = screen.update(STEP_MS / 1000);
