@@ -1,0 +1,37 @@
+name: test
+
+# The Legacy Rack is a zero-dependency static site, so this is deliberately
+# small: no install step, no build, no cache. It exists to make a red test
+# suite visible on the pull request rather than depending on whoever opened it
+# having run `npm test` locally.
+on:
+  pull_request:
+    branches: [dev, prod]
+  push:
+    branches: [dev, prod]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # node --test with no dependencies to install.
+      - name: Run tests
+        run: npm test
+
+      # Catches trailing whitespace and conflict markers, which the test suite
+      # cannot see. Compared against the merge base so it only judges what this
+      # branch actually changed.
+      - name: Check diff hygiene
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          git diff --check "origin/${{ github.base_ref }}"...HEAD
