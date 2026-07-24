@@ -595,6 +595,19 @@ it becomes unresponsive.
   access, nonce spoofing, message flood, boot hang, and runtime failure are
   blocked or safely ejected.
 - [ ] Manual approval never changes submitted code from untrusted to trusted.
+- [ ] Manifest strings have documented size caps. The F-002 hardening pass
+  proved a 5,000,000-character `goal` and 200,000-character `contentNotes`
+  validate today, joining to a ~10MB render string. Harmless while every
+  manifest is first-party; a denial-of-service surface the moment submissions
+  are accepted.
+- [ ] `source` URL validation is tightened beyond scheme checking. Dangerous
+  schemes are already rejected, but `https://evil.com@good.com/x` (userinfo
+  spoofing), `http://127.0.0.1/x` (loopback), and `https:evil.com` are all
+  accepted today. This becomes live phishing and SSRF surface once `source` is
+  a real anchor on a DOM page and once submitters supply it.
+- [ ] A cartridge cannot break the shell by replacing its own `draw` or
+  `destroy` with a non-function after `init`. Proved reachable; currently
+  produces a `TypeError` on dispose or draw.
 
 **Blocked by:** F-003, P-001.
 
