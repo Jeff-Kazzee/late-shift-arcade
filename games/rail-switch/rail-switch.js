@@ -27,16 +27,26 @@ import {
 } from './logic.js';
 import { createTextPainter } from '../../shell/canvas-text.js';
 
-const FIELD = { x: 6, y: 70, w: 628, h: 326 };
+const FIELD = { x: 6, y: 70, w: 628, h: 320 };
 const PLAN_VIEW = { k: 1.35, fx: 300, fy: 236 };
-const HIT = 26; // half-size of a junction's tap target
+// How far above its node a switch's indicator box sits, clear of the rails.
+const SWITCH_LIFT = -34;
+// A junction's tap target: 64 x 72 canvas units covering both the points and
+// the lifted indicator, well over the cabinet's MIN_TOUCH_TARGET of 44. The
+// three junctions are 176 and 290 units apart, so the generous box costs
+// nothing — and a phone thumb needs it, since the cabinet scales its glass to
+// roughly 0.56 on a portrait handset.
+const hitBox = (node) => ({ x: node.x - 32, y: node.y + SWITCH_LIFT - 22, w: 64, h: 72 });
 const END_HOLD = 1.7; // seconds the live board stays up before the score card
 
+// 150 x 68 canvas units each — the cabinet scales its 640x480 glass down to
+// about 0.56 on a portrait handset, so anything meant for a thumb has to be
+// oversized in canvas space to survive the trip.
 const BUTTONS = [
-  { id: 'hold-n', x: 8, y: 404, w: 150, h: 58, label: 'HOLD N', key: 'Z' },
-  { id: 'hold-s', x: 166, y: 404, w: 150, h: 58, label: 'HOLD S', key: 'X' },
-  { id: 'override', x: 324, y: 404, w: 150, h: 58, label: 'OVERRIDE', key: 'O' },
-  { id: 'plan', x: 482, y: 404, w: 150, h: 58, label: 'PLAN', key: 'P' },
+  { id: 'hold-n', x: 8, y: 394, w: 150, h: 68, label: 'HOLD N', key: 'Z' },
+  { id: 'hold-s', x: 166, y: 394, w: 150, h: 68, label: 'HOLD S', key: 'X' },
+  { id: 'override', x: 324, y: 394, w: 150, h: 68, label: 'OVERRIDE', key: 'O' },
+  { id: 'plan', x: 482, y: 394, w: 150, h: 68, label: 'PLAN', key: 'P' },
 ];
 const button = (id) => BUTTONS.find((b) => b.id === id);
 const inside = (p, r) => p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
@@ -68,6 +78,7 @@ export function createRailSwitch() {
   let acc = 0;
   let t = 0;
   let reported = false;
+  let armed = 0; // the tap that loaded the cartridge must not also skip the briefing
   let endHold = 0;
   let flash = null; // { text, life } — refused actions need a reason
   let sparks = [];
@@ -116,10 +127,7 @@ export function createRailSwitch() {
   };
 
   const tapJunction = (world) => {
-    const node = SWITCH_NODES.find(
-      (id) =>
-        Math.abs(world.x - NODES[id].x) <= HIT && Math.abs(world.y - NODES[id].y) <= HIT,
-    );
+    const node = SWITCH_NODES.find((id) => inside(world, hitBox(NODES[id])));
     if (!node) return false;
     throwAt(node);
     return true;
@@ -129,6 +137,9 @@ export function createRailSwitch() {
     const held = input.touches();
 
     if (state.status === 'briefing') {
+      // The board is the point of the briefing. Swallow the launching gesture
+      // so a touch player is not dropped straight onto a live shift.
+      if (armed < 0.3) return;
       if (input.pressed('action') || input.pointer.justDown) {
         command({ k: 'begin' });
         shell.sfx.play('start');
@@ -214,6 +225,7 @@ export function createRailSwitch() {
       acc = 0;
       t = 0;
       reported = false;
+      armed = 0;
       endHold = 0;
       flash = null;
       sparks = [];
@@ -221,6 +233,7 @@ export function createRailSwitch() {
 
     update(dt, input) {
       t += dt;
+      armed += dt;
       if (flash) {
         flash.life -= dt;
         if (flash.life <= 0) flash = null;
@@ -284,6 +297,13 @@ export function createRailSwitch() {
       drawButtons(ctx, text, pal);
 
       if (flash) {
+        // Backed, because it lands on top of track and labels and a refusal
+        // the player cannot read is the same as no feedback at all.
+        const w = flash.text.length * 7.4 + 22;
+        ctx.fillStyle = 'rgba(11,12,20,0.88)';
+        ctx.beginPath();
+        ctx.roundRect((CFG.W - w) / 2, FIELD.y + FIELD.h - 24, w, 22, 6);
+        ctx.fill();
         text(flash.text, CFG.W / 2, FIELD.y + FIELD.h - 8, {
           size: 12,
           color: pal.rose,
@@ -341,14 +361,16 @@ export function createRailSwitch() {
     });
     text(`SEED ${state.seed}`, CFG.W / 2, 50, { size: 9, color: pal.periwinkle });
 
-    text(`SCORE ${terminalScore(state)}`, CFG.W - 14, 26, {
+    // The shell parks its eject button over canvas x 602–634, y 6–38, so the
+    // top-right corner of the HUD stops short of it rather than hiding under it.
+    text(`SCORE ${terminalScore(state)}`, 590, 26, {
       align: 'right',
       bold: true,
       size: 13,
     });
 
     // Delay budget as a bar: the resource the whole game spends.
-    const barX = 470;
+    const barX = 430;
     const barW = 156;
     const used = Math.min(1, state.delay / CFG.DELAY_BUDGET);
     text('DELAY', barX - 6, 44, { align: 'right', size: 9, color: pal.rose });
@@ -419,16 +441,17 @@ export function createRailSwitch() {
       ctx.stroke();
     }
 
-    text('SINGLE LINE', (NODES.tw.x + NODES.te.x) / 2, NODES.tw.y - 14, {
+    // Standing labels sit clear of y−13, where running trains hang their tags.
+    text('SINGLE LINE', (NODES.tw.x + NODES.te.x) / 2, NODES.tw.y - 30, {
       size: 9,
       color: pal.rose,
       bold: true,
     });
-    text('SLOW BYPASS → A', (NODES.bn1.x + NODES.bn2.x) / 2, NODES.bn1.y - 12, {
+    text('SLOW BYPASS → A', (NODES.bn1.x + NODES.bn2.x) / 2, NODES.bn1.y + 42, {
       size: 9,
       color: pal.periwinkle,
     });
-    text('SLOW BYPASS → C', (NODES.bs1.x + NODES.bs2.x) / 2, NODES.bs1.y + 20, {
+    text('SLOW BYPASS → C', (NODES.bs1.x + NODES.bs2.x) / 2, NODES.bs1.y + 18, {
       size: 9,
       color: pal.periwinkle,
     });
@@ -483,9 +506,14 @@ export function createRailSwitch() {
         bold: overdue > 0,
         color: overdue > 0 ? pal.rose : pal.periwinkle,
       });
-      const upcoming = queue.slice(0, 3).map((train) => train.dest).join('');
-      if (upcoming) {
-        text(upcoming, node.x - 9, node.y + 27, { size: 9, color: pal.periwinkle });
+      const next = queue[0];
+      if (next) {
+        const due = next.releaseAt - state.time;
+        text(due > 0 ? `→${next.dest} ${Math.ceil(due)}s` : `→${next.dest} NOW`, node.x - 9, node.y + 28, {
+          size: 9,
+          bold: due <= 0,
+          color: due > 0 ? pal.periwinkle : pal.rose,
+        });
       }
     }
 
@@ -509,14 +537,35 @@ export function createRailSwitch() {
       ctx.shadowBlur = 0;
     }
 
-    // 6. switches — the only things you can touch on the board
+    // 6. switches — the only things you can touch on the board. The indicator
+    // is lifted clear of the rails on a stalk: a train standing on the points
+    // used to sit right on top of the setting, hiding it at the one moment the
+    // player most needs to read it.
     for (const id of SWITCH_NODES) {
       const node = NODES[id];
       const locked = isLocked(state, id);
       const label = node.optionLabels[state.switches[id]];
+      const boxY = node.y + SWITCH_LIFT;
+
+      ctx.strokeStyle = locked ? pal.rose : pal.amber;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(node.x, boxY + 13);
+      ctx.lineTo(node.x, node.y - 4);
+      ctx.stroke();
+
+      // the points themselves, on the track
+      ctx.fillStyle = locked ? pal.rose : pal.amber;
+      ctx.beginPath();
+      ctx.moveTo(node.x, node.y - 5);
+      ctx.lineTo(node.x + 5, node.y);
+      ctx.lineTo(node.x, node.y + 5);
+      ctx.lineTo(node.x - 5, node.y);
+      ctx.fill();
+
       ctx.fillStyle = '#141834';
       ctx.beginPath();
-      ctx.roundRect(node.x - 25, node.y - 13, 50, 26, 6);
+      ctx.roundRect(node.x - 25, boxY - 13, 50, 26, 6);
       ctx.fill();
       ctx.strokeStyle = locked ? pal.rose : pal.amber;
       ctx.lineWidth = locked ? 2 : 1.5;
@@ -526,13 +575,16 @@ export function createRailSwitch() {
       }
       ctx.stroke();
       ctx.shadowBlur = 0;
-      text(label, node.x, node.y + 4, {
+      text(label, node.x, boxY + 4, {
         size: label.length > 4 ? 9 : 13,
         bold: true,
         color: locked ? pal.rose : pal.cream,
       });
-      text(node.label, node.x, node.y - 17, { size: 8, color: pal.periwinkle });
-      if (locked) text('LOCKED', node.x, node.y + 22, { size: 8, color: pal.rose, bold: true });
+      text(locked ? `${node.label} LOCKED` : node.label, node.x, boxY - 17, {
+        size: 8,
+        bold: locked,
+        color: locked ? pal.rose : pal.periwinkle,
+      });
     }
 
     if (overrideActive(state)) {
@@ -540,7 +592,13 @@ export function createRailSwitch() {
       ctx.lineWidth = 2;
       for (const id of SWITCH_NODES) {
         ctx.beginPath();
-        ctx.arc(NODES[id].x, NODES[id].y, 30 + Math.sin(t * 20) * 3, 0, Math.PI * 2);
+        ctx.arc(
+          NODES[id].x,
+          NODES[id].y + SWITCH_LIFT / 2,
+          34 + Math.sin(t * 20) * 3,
+          0,
+          Math.PI * 2,
+        );
         ctx.stroke();
       }
     }
@@ -628,7 +686,7 @@ export function createRailSwitch() {
 
       const label =
         b.id === 'override' ? `${b.label} ${state.overridesLeft}` : b.label;
-      text(label, b.x + b.w / 2, b.y + 30, {
+      text(label, b.x + b.w / 2, b.y + 34, {
         size: 15,
         bold: true,
         color: enabled ? (active ? pal.cream : color) : pal.hairline,
@@ -641,7 +699,7 @@ export function createRailSwitch() {
             : b.id === 'override'
               ? '−2000 · O'
               : 'PAUSE TRAINS · P';
-      text(sub, b.x + b.w / 2, b.y + 47, { size: 9, color: pal.periwinkle });
+      text(sub, b.x + b.w / 2, b.y + 52, { size: 9, color: pal.periwinkle });
     }
     text('TAP A JUNCTION TO THROW IT · KEYS 1 JN · 2 JS · 3 EXIT', CFG.W / 2, 474, {
       size: 10,
@@ -650,7 +708,7 @@ export function createRailSwitch() {
   }
 
   function drawBriefing(ctx, text, pal) {
-    ctx.fillStyle = 'rgba(11,12,20,0.86)';
+    ctx.fillStyle = 'rgba(11,12,20,0.93)';
     ctx.fillRect(0, 0, CFG.W, CFG.H);
     text('RAIL SWITCH', CFG.W / 2, 76, { size: 34, bold: true, color: pal.amber, glow: 14 });
     text(
@@ -700,6 +758,7 @@ export function createRailSwitch() {
     });
   }
 
+
   function drawOutcome(ctx, text, pal) {
     const won = state.status === 'won';
     const reason = {
@@ -725,3 +784,6 @@ export function createRailSwitch() {
     }
   }
 }
+
+// The default export is the cartridge factory: how the rack loads a game.
+export default createRailSwitch;

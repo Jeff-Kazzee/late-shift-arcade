@@ -25,7 +25,7 @@ import {
   terminalScore,
   throwSwitch,
   useOverride,
-} from '../games/rail-switch/logic.js';
+} from './logic.js';
 
 const onTrack = (train) => train.state === 'run' || train.state === 'stalled';
 const trainById = (state, id) => state.trains.find((train) => train.id === id);
@@ -528,14 +528,33 @@ test('simulation state stays plain serializable data throughout a shift', () => 
   }
 });
 
-// --- Solvability ----------------------------------------------------------
+// --- Solvability and pressure ---------------------------------------------
 //
-// A deliberately dim reference dispatcher: it serialises the whole network,
-// never uses a bypass, and never overrides. If this policy clears a seed, the
-// seed is solvable — and the delay it spends is what CFG.DELAY_BUDGET and
-// CFG.SHIFT_SECONDS are sized against.
+// Two reference dispatchers, and the gap between them is the game.
+//
+//   competent — holds a train short of the single line while another is using
+//               it, and takes a free bypass rather than wait. Must always win:
+//               this is what sizes CFG.DELAY_BUDGET and CFG.SHIFT_SECONDS.
+//   careless  — routes every train perfectly but never holds anything. Must
+//               fail often. If it stops failing, the trunk has silently become
+//               two independent lines and the shared-track pressure, the delay
+//               budget and the overrides are all decoration.
 
 const SHARED = new Set(['n-trunk-in', 's-trunk-in', 'trunk']);
+const BYPASS = {
+  n: ['n-bypass-a', 'n-bypass-b', 'n-bypass-c'],
+  s: ['s-bypass-a', 's-bypass-b', 's-bypass-c'],
+};
+const BYPASS_DEST = { n: 'A', s: 'C' };
+
+// Remaining distance to the exit switch, or Infinity if not headed for it.
+function toExit(train) {
+  if (train.edge === 'trunk') return EDGES.trunk.len - train.dist;
+  if (train.edge === 'n-trunk-in' || train.edge === 's-trunk-in') {
+    return EDGES[train.edge].len - train.dist + EDGES.trunk.len;
+  }
+  return Infinity;
+}
 
 function committed(state, side) {
   const edge = SIGNALS[side].edge;
@@ -544,9 +563,14 @@ function committed(state, side) {
   );
 }
 
-function referenceDispatch(state) {
-  setSwitch(state, 'jn', 0);
-  setSwitch(state, 'js', 0);
+function carelessDispatch(state) {
+  const next = state.trains
+    .filter((train) => onTrack(train) && toExit(train) < Infinity)
+    .sort((a, b) => toExit(a) - toExit(b))[0];
+  if (next) setSwitch(state, 'te', PLATFORMS.indexOf(next.dest));
+}
+
+function competentDispatch(state) {
   const occupant =
     state.trains.find((train) => onTrack(train) && SHARED.has(train.edge)) ??
     committed(state, 'n') ??
@@ -559,28 +583,39 @@ function referenceDispatch(state) {
       (train) => onTrack(train) && train.edge === edge && train.dist <= signalPos(edge),
     );
   }
+  const viaBypass = {};
+  for (const side of ['n', 's']) {
+    const train = lead[side];
+    viaBypass[side] =
+      Boolean(train) &&
+      Boolean(occupant) &&
+      train.dest === BYPASS_DEST[side] &&
+      BYPASS[side].every((edge) => !state.trains.some((x) => onTrack(x) && x.edge === edge));
+  }
   const claim = occupant ? null : lead.n ? 'n' : lead.s ? 's' : null;
-  for (const side of ['n', 's']) setSignal(state, side, Boolean(lead[side]) && claim !== side);
-
+  for (const side of ['n', 's']) {
+    setSwitch(state, side === 'n' ? 'jn' : 'js', viaBypass[side] ? 1 : 0);
+    setSignal(state, side, Boolean(lead[side]) && claim !== side && !viaBypass[side]);
+  }
   const target = occupant ?? (claim ? lead[claim] : null);
   if (target) setSwitch(state, 'te', PLATFORMS.indexOf(target.dest));
 }
 
-function autoRun(seed) {
+function autoRun(seed, policy) {
   const state = newShift(seed);
   begin(state);
-  for (let i = 0; i < 60 * 200 && state.status === 'running'; i += 1) {
-    referenceDispatch(state);
+  for (let i = 0; i < 60 * 220 && state.status === 'running'; i += 1) {
+    policy(state);
     step(state, CFG.TICK);
   }
   return state;
 }
 
-test('a plodding reference dispatcher clears every seed it is given', () => {
+test('competent dispatch clears every seed, inside the budget and the clock', () => {
   let worstDelay = 0;
   let leastSlack = Infinity;
-  for (let seed = 1; seed <= 60; seed += 1) {
-    const state = autoRun(seed);
+  for (let seed = 1; seed <= 80; seed += 1) {
+    const state = autoRun(seed, competentDispatch);
     assert.equal(state.status, 'won', `seed ${seed} is solvable (${state.failure})`);
     assert.equal(state.overrides, 0, 'without spending an override');
     worstDelay = Math.max(worstDelay, state.delay);
@@ -588,11 +623,25 @@ test('a plodding reference dispatcher clears every seed it is given', () => {
   }
   assert.ok(worstDelay < CFG.DELAY_BUDGET, `worst delay ${worstDelay} fits the budget`);
   assert.ok(leastSlack > 0, `worst slack ${leastSlack} fits the clock`);
-  // Headroom, not comfort: if this ever grows past the budget the schedule has
-  // drifted and the numbers in CFG need re-measuring, not nudging.
-  assert.ok(worstDelay > CFG.DELAY_BUDGET * 0.5, 'the budget still bites a lazy policy');
 });
 
-test('the reference dispatcher is itself deterministic', () => {
-  assert.deepStrictEqual(autoRun(11), autoRun(11));
+test('careless dispatch — perfect routing, never holds — wrecks often enough to matter', () => {
+  let failures = 0;
+  let collisions = 0;
+  for (let seed = 1; seed <= 80; seed += 1) {
+    const state = autoRun(seed, carelessDispatch);
+    if (state.status === 'won') continue;
+    failures += 1;
+    if (state.failure === 'collision') collisions += 1;
+  }
+  // Measured at ~26% over 300 seeds. The floor is the regression guard: if a
+  // change to the schedule or the network makes never-holding safe, the single
+  // line has stopped being shared and this test is the thing that notices.
+  assert.ok(failures >= 12, `careless dispatch failed only ${failures}/80 shifts`);
+  assert.ok(collisions >= 6, `only ${collisions} of those were collisions`);
+});
+
+test('the reference dispatchers are themselves deterministic', () => {
+  assert.deepStrictEqual(autoRun(11, competentDispatch), autoRun(11, competentDispatch));
+  assert.deepStrictEqual(autoRun(11, carelessDispatch), autoRun(11, carelessDispatch));
 });

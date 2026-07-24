@@ -21,14 +21,18 @@ export const CFG = {
   H: 480,
   TICK: 1 / 60,
 
-  // Both numbers are measured, not guessed. A deliberately dim reference
-  // dispatcher (test/rail-switch.test.js) that serialises the whole network
-  // and never uses a bypass finishes 300 seeds with at most 46.1 delay-seconds
-  // spent and at least 35.8 seconds spare. The budget and the clock sit just
-  // outside that envelope: a simple policy always survives, a sloppy one does
-  // not, and the -20/delay-second penalty does the rest of the work.
+  // Both numbers are measured, not guessed, against the two reference
+  // dispatchers in ./rail-switch.test.js. Over 240 seeds the competent one
+  // (holds for the single line, takes a free bypass) never spends more than
+  // 101 delay-seconds and always finishes with 30+ seconds spare, while the
+  // careless one — perfect routing, never holds anything — wrecks on a quarter
+  // of all shifts. The budget sits just above the competent ceiling: good
+  // dispatching survives it, sloppy dispatching does not.
+  //
+  // Delay is counted per train, so two trains stopped for one second spend two
+  // delay-seconds. That is why the budget is larger than the shift itself.
   SHIFT_SECONDS: 110,
-  DELAY_BUDGET: 55, // delay-seconds before the controller pulls the shift
+  DELAY_BUDGET: 105,
   OVERRIDES: 2,
   OVERRIDE_WINDOW: 1.6, // seconds of dropped interlocks per override
 
@@ -43,6 +47,15 @@ export const CFG = {
 
   TRAIN_COUNT: 11,
   REQUIRED_COUNT: 7,
+  // Schedule shape. BURST_* is the gap between arrivals inside one wave and is
+  // the single most sensitive number in the game: when it exceeds the time a
+  // train occupies the trunk, opposite-side arrivals stop conflicting and the
+  // shared line silently becomes two independent lines.
+  BURST_GAP: 0.5,
+  BURST_SPAN: 1.5,
+  WAVE_GAP: 8,
+  WAVE_SPAN: 4,
+  BURST_MAX: 3,
 
   SCORE_DELIVERY: 10000,
   SCORE_SECOND: 50,
@@ -83,11 +96,15 @@ export const NODES = Object.freeze({
   },
   bn1: { x: 250, y: 96, kind: 'bend', next: 'n-bypass-b' },
   bn2: { x: 474, y: 96, kind: 'bend', next: 'n-bypass-c' },
-  bs1: { x: 250, y: 376, kind: 'bend', next: 's-bypass-b' },
-  bs2: { x: 474, y: 376, kind: 'bend', next: 's-bypass-c' },
-  tw: { x: 296, y: 236, kind: 'merge', next: 'trunk' },
+  bs1: { x: 250, y: 368, kind: 'bend', next: 's-bypass-b' },
+  bs2: { x: 474, y: 368, kind: 'bend', next: 's-bypass-c' },
+  // The trunk is deliberately long. A train has to hold the single line for
+  // roughly 2.3 seconds, which is longer than the gap inside an arrival burst
+  // — that overlap is the entire conflict, and a shorter trunk quietly
+  // removes it. Measured: shorten this and careless dispatch stops wrecking.
+  tw: { x: 270, y: 236, kind: 'merge', next: 'trunk' },
   te: {
-    x: 430,
+    x: 456,
     y: 236,
     kind: 'switch',
     label: 'TE',
@@ -182,11 +199,11 @@ export function buildSchedule(seed) {
   for (let i = 0; i < CFG.TRAIN_COUNT; i += 1) {
     if (i > 0) {
       if (burstLeft > 0) {
-        clock += 1.8 + rng() * 1.8; // inside a burst
+        clock += CFG.BURST_GAP + rng() * CFG.BURST_SPAN;
         burstLeft -= 1;
       } else {
-        clock += 8 + rng() * 4; // between bursts
-        burstLeft = 1 + Math.floor(rng() * 3);
+        clock += CFG.WAVE_GAP + rng() * CFG.WAVE_SPAN;
+        burstLeft = 1 + Math.floor(rng() * CFG.BURST_MAX);
       }
     }
     const required = flags[i];
