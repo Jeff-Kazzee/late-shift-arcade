@@ -5,10 +5,15 @@ read `skills/dorveille/SKILL.md` and follow it for the whole session: state
 chip on every response, obey the sleep-pressure table, keep `.dorveille/`
 current. The session is not done until N3 runs.
 
-At the end of every WAKE block, run REM and N3, then use the `handoff` skill to
-overwrite `C:\tmp\late-shift-arcade-resume-handoff-2026-07-24.md` with current
-worktree truth and exactly one next unblocked ticket. Stop before starting that
-ticket so a fresh session can resume one block at a time.
+At the end of every WAKE block, run REM and N3, then overwrite the handoff file
+for the stream you are working in with current worktree truth and exactly one
+next unblocked ticket. Stop before starting that ticket so a fresh session can
+resume one block at a time.
+
+Handoff files live outside the repository, one per stream, named
+`late-shift-arcade-handoff-<stream>.md` in the machine's temp directory. Do not
+date-stamp the filename — a handoff is current truth that gets overwritten, not
+an archive. See `EXECUTION-PLAN.md` for the stream list.
 
 ## Platform charter
 
