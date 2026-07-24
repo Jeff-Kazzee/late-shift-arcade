@@ -60,7 +60,10 @@ test('all eight Legacy Rack cards and detail routes share complete manifests', (
     'madeWith',
   ];
 
-  assert.equal(cartridges.length, 8);
+  // The compendium grows a game at a time; assert the Legacy Rack floor rather
+  // than an exact count so a new cartridge is one registry entry, not a
+  // shared-test edit that every concurrent game branch has to merge.
+  assert.ok(cartridges.length >= 8);
   for (const entry of cartridges) {
     const cardManifest = entry.manifest;
     const directUrl = detailUrlFor(cardManifest, 'https://example.com/index.html');
