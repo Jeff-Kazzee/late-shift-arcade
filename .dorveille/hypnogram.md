@@ -18,3 +18,7 @@ s2026-07-23 12 [WAKE] block 4 done: AIR HOCKEY playable, 38/38 tests (one test f
 s2026-07-23 13 [WAKE] block 5 done: ASTEROID DEFENDER, 46/46 tests, chain-blast logic tested + browser-verified; block 6 begins: PIXEL LIFE (67-event corpus)
 s2026-07-23 14 [WAKE→N3] block 6 done: PIXEL LIFE playable, 54/54 tests, browser-verified; placeholder.js pruned; two HUD collisions with the eject button fixed (breakout lives, pixel-life stat bars); all five cartridges real
 s2026-07-23 15 [N3] replay green, no debt; REMAINING: task 5 — REM nightmare pass + authorship strip + GitHub Pages deploy (needs a remote; user decision on repo)
+s2026-07-23 16 [N3→WATCH] user: "under-designed, weak, holding mouse is distracting" — hover steering was a real input bug; "beautiful" bar enforced: sfx graduates off the nightstand, juice pass ordered
+s2026-07-23 17 [WATCH→REM] REM gate ran as two agents: authorship strip found 7 (edges-per-frame fall-through, single-pointer 2P, tap-launch, mallet teleport, R blocked on qualify, pong rematch, no deploy); nightmare found 3 (rAF loop dies on throw + roundRect, portrait postage stamp, storage-blocked lying high score)
+s2026-07-23 18 [REM→WAKE] all 10 findings fixed + sfx/trails/particles/shake; 55/55 green; committed, repo created (Jeff-Kazzee/late-shift-arcade), Pages live and verified
+s2026-07-23 19 [WAKE] user redirect: game 5 becomes a Galaga-style shooter — block 7: GALAXY RAID; pixel-life keeps its module+tests but leaves the cabinet registry

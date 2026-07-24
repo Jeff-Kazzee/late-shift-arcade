@@ -50,15 +50,18 @@ growing blast circle; blasts chain. Limited missiles per wave, rebuilt
 between waves. Lose all six city blocks and it's over. Score: asteroids
 destroyed, bonus for surviving buildings and unused missiles.
 
-### 5. PIXEL LIFE
+### 5. GALAXY RAID
 
-BitLife-style life sim, text-first. One AGE UP button. Each year draws 1-2
-random events from a data table (`games/pixel-life/events.js`): school,
-jobs, relationships, windfalls, disasters. Stats: Health, Smarts, Money,
-Happiness — events shift them and gate later events. Death produces an
-obituary card summarizing the run (age, peak stats, weirdest event). 60+
-events minimum, written dry and funny. All content data-driven so adding
-events is trivial.
+Galaga-style formation shooter. Enemies swoop in along staggered curves,
+settle into a breathing formation, and peel off in dive runs that fire
+aimed shots. Player ship moves horizontally (hover/drag/arrows), two shots
+in the air max. Three enemy tiers (bee, butterfly, armored boss) scoring
+more when hit mid-dive. 3 lives with respawn invulnerability; waves escalate
+in size and dive frequency.
+
+> Note: the original slot-5 game, PIXEL LIFE (BitLife-style sim, 60+ event
+> table in `games/pixel-life/events.js`), is built, tested, and kept in the
+> tree — swapped out of the cabinet for GALAXY RAID on 2026-07-23.
 
 ## Done means
 

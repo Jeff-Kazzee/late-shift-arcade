@@ -72,6 +72,8 @@ export function createSfx() {
       tone({ freq: 784, dur: 0.09, delay: 0.05 });
     },
     launch: () => tone({ freq: 700, end: 1250, dur: 0.14, type: 'sawtooth', vol: 0.05 }),
+    pew: () => tone({ freq: 880, end: 220, dur: 0.07, type: 'sawtooth', vol: 0.06 }),
+    zap: () => tone({ freq: 660, end: 110, dur: 0.12, vol: 0.09 }),
     boom: () => noise({ dur: 0.22, vol: 0.14 }),
     bigboom: () => {
       noise({ dur: 0.45, vol: 0.24 });
