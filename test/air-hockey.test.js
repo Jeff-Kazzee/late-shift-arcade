@@ -78,6 +78,37 @@ test('seventh goal wins and the table freezes', () => {
   assert.deepEqual(step(state, 1 / 60), []);
 });
 
+test('a mallet crowding the puck into a corner cannot push it out of the table', () => {
+  const state = liveGame();
+  state.puck = { x: CFG.PUCK_R + 2, y: CFG.PUCK_R + 2, vx: 0, vy: 0 };
+  state.mallets[0] = { x: CFG.MALLET_R, y: CFG.MALLET_R, vx: 200, vy: 200 };
+  for (let i = 0; i < 30; i += 1) {
+    step(state, 1 / 60);
+    assert.ok(state.puck.x >= CFG.PUCK_R - 0.01, `puck escaped left wall: ${state.puck.x}`);
+    assert.ok(state.puck.y >= CFG.PUCK_R - 0.01, `puck escaped top wall: ${state.puck.y}`);
+  }
+});
+
+test('a puck resting in a corner gets nudged back into play', () => {
+  const state = liveGame();
+  state.puck = { x: 20, y: 20, vx: 0, vy: 0 };
+  let nudged = false;
+  for (let i = 0; i < 60 * 3 && !nudged; i += 1) {
+    nudged = step(state, 1 / 60).includes('nudge');
+  }
+  assert.ok(nudged, 'stall rescue fired');
+  assert.ok(state.puck.vx > 0 && state.puck.vy > 0, 'nudge points back toward center');
+});
+
+test('a puck resting mid-table (a fresh serve) is left alone', () => {
+  const state = liveGame();
+  state.puck = { x: 250, y: CFG.H / 2, vx: 0, vy: 0 };
+  for (let i = 0; i < 60 * 3; i += 1) {
+    assert.ok(!step(state, 1 / 60).includes('nudge'));
+  }
+  assert.equal(state.puck.vx, 0);
+});
+
 test('cpu defends its line when the puck is in the player half, chases when home', () => {
   const state = newGame();
   state.puck.x = 150;

@@ -15,6 +15,10 @@ export const CFG = {
   SERVE_DELAY: 0.9,
   WIN: 7,
   CPU_DEFENSE_X: 560,
+  STALL_SPEED: 25,
+  STALL_TIME: 1.8,
+  STALL_WALL_DIST: 60,
+  NUDGE_SPEED: 130,
 };
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -29,6 +33,7 @@ export function newGame() {
     scores: [0, 0],
     serveIn: CFG.SERVE_DELAY,
     serveSide: 0, // who receives the puck on serve
+    stallT: 0,
     winner: null,
   };
 }
@@ -180,6 +185,33 @@ export function step(state, dt) {
 
   collideMallet(state, 0, events);
   collideMallet(state, 1, events);
+
+  // corner rescue: a mallet push-out can pin the puck against a wall where
+  // friction + restitution bleed every escape. Keep it inside the table,
+  // and a puck resting against a wall gets nudged back into play.
+  if (!inGoalMouth(p.y)) p.x = clamp(p.x, CFG.PUCK_R, CFG.W - CFG.PUCK_R);
+  p.y = clamp(p.y, CFG.PUCK_R, CFG.H - CFG.PUCK_R);
+
+  const speed = Math.hypot(p.vx, p.vy);
+  const nearWall =
+    p.x < CFG.STALL_WALL_DIST ||
+    p.x > CFG.W - CFG.STALL_WALL_DIST ||
+    p.y < CFG.STALL_WALL_DIST ||
+    p.y > CFG.H - CFG.STALL_WALL_DIST;
+  if (speed < CFG.STALL_SPEED && nearWall) {
+    state.stallT += dt;
+    if (state.stallT >= CFG.STALL_TIME) {
+      const dx = CFG.W / 2 - p.x;
+      const dy = CFG.H / 2 - p.y;
+      const d = Math.hypot(dx, dy) || 1;
+      p.vx = (dx / d) * CFG.NUDGE_SPEED;
+      p.vy = (dy / d) * CFG.NUDGE_SPEED;
+      state.stallT = 0;
+      events.push('nudge');
+    }
+  } else {
+    state.stallT = 0;
+  }
 
   return events;
 }

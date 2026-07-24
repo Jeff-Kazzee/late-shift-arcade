@@ -89,6 +89,7 @@ export function createAirHockey() {
         shell.shake(6);
         trail = [];
       }
+      if (events.includes('nudge')) shell.sfx.play('move');
 
       if (Math.hypot(state.puck.vx, state.puck.vy) > 40) {
         trail.push({ x: state.puck.x, y: state.puck.y });
