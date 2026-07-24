@@ -16,7 +16,7 @@ session, with hypnogram evidence cited.
 | Operator | Fielded | Won | Notes |
 | --- | --- | --- | --- |
 | Condensation | 1 | 0 | assist: pause-as-stopped-clock fused into s2026-07-23 winner (hypnogram 3–4) |
-| Displacement | 2 | 1 | won s2026-07-23 burst #2: catalog manifests + fresh transactional sessions (hypnogram 24–25) |
+| Displacement | 3 | 2 | won s2026-07-24 expansion-plan burst: four-game emotional/verb sequence (hypnogram s2026-07-24 4–5) |
 | Day-residue | 1 | 0 | over-engineered (signal DAG); killed in revision |
 | Negation-blindness | 1 | 1 | won burst #1: screens-yield-successor shell architecture |
 | Nightmare | 0 | 0 | — |
