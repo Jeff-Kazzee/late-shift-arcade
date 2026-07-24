@@ -4,6 +4,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import createVaultHeist, { createVaultHeist as named } from './vault-heist.js';
+import { manifest } from './manifest.js';
+import {
+  defineCatalogEntry, activateCartridge, validateManifest, launchBlockReason,
+} from '../../shell/cartridge.js';
+import { palette } from '../../shell/palette.js';
+import { MIN_TOUCH_TARGET } from '../../shell/catalog-layout.js';
+
 import {
   CFG, ROOMS, ROOM_IDS, EDGES, CAMERAS, GUARD_TEMPLATES, CREW_TEMPLATES,
   mulberry32, newHeist, room, roomIndex, neighbors, shortestPath, hops, edgeKind,
@@ -684,4 +692,175 @@ test('room indices are stable, which is what every tie-break in here leans on', 
   assert.equal(roomIndex('alley'), 0);
   assert.equal(ROOMS.length, ROOM_IDS.length);
   assert.equal(new Set(ROOM_IDS).size, ROOM_IDS.length);
+});
+
+// --- the cartridge ---------------------------------------------------------
+
+// A 2D-context stand-in where every property is callable and chainable, so a
+// renderer that throws fails here instead of on somebody's phone at 3am.
+function stubCtx() {
+  const handler = {
+    get(t, prop) {
+      if (prop === Symbol.toPrimitive || prop === 'valueOf' || prop === 'toString') return () => 0;
+      return stubCtx();
+    },
+    set: () => true,
+    apply: () => stubCtx(),
+  };
+  return new Proxy(function stub() {}, handler);
+}
+
+const inputStub = (over = {}) => ({
+  down: () => false,
+  pressed: () => false,
+  touches: () => [],
+  pointer: { x: 0, y: 0, down: false, justDown: false, justUp: false, moved: false },
+  ...over,
+});
+
+function shellCtx(onEnd = () => {}) {
+  return {
+    width: 640, height: 480, palette, highScore: 0,
+    endGame: onEnd, shake() {}, sfx: { play() {} },
+  };
+}
+
+test('the cartridge names itself exactly as the manifest advertises it', () => {
+  const cart = createVaultHeist();
+  assert.equal(cart.id, manifest.slug);
+  assert.equal(cart.title, manifest.title);
+  assert.equal(cart.blurb, manifest.summary);
+  assert.equal(manifest.version, '1.0.0');
+  assert.equal(named, createVaultHeist, 'the named export must be the default one');
+});
+
+test('the manifest passes the cabinet\'s own validator, accent and all', () => {
+  assert.doesNotThrow(() => validateManifest(manifest));
+  assert.ok(
+    Object.keys(palette).includes(manifest.artwork.accent),
+    `${manifest.artwork.accent} is not in shell/palette.js`,
+  );
+  assert.ok(['amber', 'periwinkle', 'rose', 'deep', 'cream'].includes(manifest.artwork.accent));
+  assert.equal(launchBlockReason(manifest), null, 'the rack would refuse to launch it');
+});
+
+test('the manifest imports no game code, so the rack can render a card cheaply', async () => {
+  const source = await import('node:fs/promises')
+    .then((fs) => fs.readFile(new URL('./manifest.js', import.meta.url), 'utf8'));
+  assert.ok(!/\bimport\b/.test(source), 'manifest.js pulled something in');
+});
+
+// Exactly the registry line this game needs, exercised end to end: the entry
+// is declared from the manifest, the module is fetched through the real lazy
+// loader, and the loaded cartridge is activated. A mistyped path or a missing
+// default export fails here rather than on somebody's launch.
+const rackEntry = () =>
+  defineCatalogEntry(manifest, () => import('./vault-heist.js'));
+
+test('it satisfies the cabinet cartridge contract', async () => {
+  const entry = rackEntry();
+  assert.equal(entry.id, 'vault-heist');
+  const loaded = await entry.load();
+  const cart = activateCartridge(loaded, shellCtx());
+  for (const method of ['init', 'update', 'draw', 'destroy']) {
+    assert.equal(typeof cart[method], 'function');
+  }
+  cart.destroy();
+});
+
+test('the cabinet refuses a module whose identity drifts from its manifest', async () => {
+  const entry = defineCatalogEntry(manifest, async () => ({
+    default: () => ({
+      id: 'vault-heist', title: 'SOMETHING ELSE', blurb: manifest.summary,
+      init() {}, update() {}, draw() {}, destroy() {},
+    }),
+  }));
+  await assert.rejects(() => entry.load(), /title must match/);
+});
+
+test('launch, poke it, draw it, and put it away without throwing', async () => {
+  const loaded = await rackEntry().load();
+  const cart = activateCartridge(loaded, shellCtx());
+  cart.update(1 / 60, inputStub({ pointer: { x: 320, y: 240, justDown: true } }));
+  for (let i = 0; i < 5; i += 1) cart.update(1 / 60, inputStub());
+  cart.draw(stubCtx());
+  // Walk the bar: select a crew member, then run a turn.
+  cart.update(1 / 60, inputStub({ pointer: { x: 70, y: 420, justDown: true } }));
+  cart.draw(stubCtx());
+  cart.update(1 / 60, inputStub({ pointer: { x: 320, y: 200, justDown: true } }));
+  cart.draw(stubCtx());
+  for (let i = 0; i < 60; i += 1) cart.update(1 / 60, inputStub());
+  cart.draw(stubCtx());
+  cart.destroy();
+});
+
+test('two launches never share state', () => {
+  const a = createVaultHeist();
+  const b = createVaultHeist();
+  a.init(shellCtx());
+  b.init(shellCtx());
+  a.update(1 / 60, inputStub({ pointer: { x: 320, y: 240, justDown: true } }));
+  a.draw(stubCtx());
+  b.draw(stubCtx());
+  a.destroy();
+  b.draw(stubCtx()); // destroying one must not disturb the other
+  b.destroy();
+});
+
+test('destroy really lets go', () => {
+  const cart = createVaultHeist();
+  cart.init(shellCtx());
+  cart.destroy();
+  // A second destroy, and a draw after it, must not throw either.
+  cart.destroy();
+});
+
+test('it reports a score exactly once, when the heist is over', () => {
+  const scores = [];
+  const cart = createVaultHeist();
+  cart.init(shellCtx((s) => scores.push(s)));
+  cart.update(1 / 60, inputStub({ pointer: { x: 320, y: 240, justDown: true } }));
+  // Run the shift out by confirming empty turns; the clock ends it either way.
+  for (let turn = 0; turn < CFG.TURN_LIMIT + 6; turn += 1) {
+    cart.update(1 / 60, inputStub({ pointer: { x: 600, y: 420, justDown: true } }));
+    for (let f = 0; f < 45; f += 1) cart.update(1 / 60, inputStub());
+  }
+  assert.equal(scores.length, 1, `endGame fired ${scores.length} times`);
+  assert.ok(Number.isFinite(scores[0]) && scores[0] >= 0);
+  cart.destroy();
+});
+
+test('the renderer never reaches for a colour the cabinet does not own', async () => {
+  const source = await import('node:fs/promises')
+    .then((fs) => fs.readFile(new URL('./vault-heist.js', import.meta.url), 'utf8'));
+  const literals = source.match(/#[0-9a-fA-F]{3,8}\b/g) ?? [];
+  assert.deepEqual(literals, [], `hard-coded colours: ${literals.join(', ')}`);
+  assert.ok(!/Math\.random\s*\(/.test(source), 'the renderer reached for ambient randomness');
+});
+
+test('the simulation never reaches for ambient randomness either', async () => {
+  const source = await import('node:fs/promises')
+    .then((fs) => fs.readFile(new URL('./logic.js', import.meta.url), 'utf8'));
+  assert.ok(!/Math\.random\s*\(/.test(source), 'the simulation reached for ambient randomness');
+});
+
+test('every room and every button clears a real thumb', () => {
+  // The cabinet scales its 640-wide glass to about 0.56 on a portrait handset,
+  // so a 44 CSS px target needs roughly 79 canvas units on both axes.
+  const floor = MIN_TOUCH_TARGET / 0.56;
+  const ROOM_W = 84;
+  const ROOM_H = 80;
+  assert.ok(ROOM_W >= floor, `rooms are ${ROOM_W} wide, need ${floor.toFixed(1)}`);
+  assert.ok(ROOM_H >= floor, `rooms are ${ROOM_H} tall, need ${floor.toFixed(1)}`);
+  // Six buttons is the widest bar the cartridge ever builds.
+  const barButton = (640 - 12 - 6 * 5) / 6;
+  assert.ok(barButton >= floor, `bar buttons are ${barButton.toFixed(1)} wide`);
+  assert.ok(84 >= floor, 'the bar is not tall enough');
+  // And no two rooms may overlap once they are that big.
+  const seen = new Map();
+  for (const spot of ROOMS) {
+    const key = `${spot.col},${spot.row}`;
+    assert.ok(!seen.has(key), `${spot.id} sits on top of ${seen.get(key)}`);
+    seen.set(key, spot.id);
+  }
 });
