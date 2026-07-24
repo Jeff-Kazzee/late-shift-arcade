@@ -7,6 +7,7 @@ export function detailUrlFor(manifest, baseUrl) {
 }
 
 export function resolveCatalogDetail(entries, urlValue) {
+  if (!Array.isArray(entries)) return null;
   let url;
   try {
     url = new URL(urlValue);

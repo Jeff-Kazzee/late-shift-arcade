@@ -10,7 +10,7 @@ import { createSfx } from './sfx.js';
 import { createTextPainter } from './canvas-text.js';
 import { disposeScreen } from './screen.js';
 import { advance, STEP_MS } from './loop.js';
-import { activateCartridge } from './cartridge.js';
+import { activateCartridge, launchBlockReason } from './cartridge.js';
 import { detailUrlFor, resolveCatalogDetail } from './catalog.js';
 import {
   cardsForPage,
@@ -317,7 +317,11 @@ function selectScreen() {
 function detailScreen(entry) {
   const manifest = entry.manifest;
   const accent = palette[manifest.artwork.accent] ?? palette.amber;
-  const launchable = manifest.releaseStatus === 'published';
+  // Ask the launch gate itself rather than re-deriving its rules here; a
+  // second copy of this policy is how the screen came to offer a launch the
+  // gate would refuse.
+  const blockReason = launchBlockReason(manifest);
+  const launchable = blockReason === null;
   showEject(true);
   consumeEject();
 
@@ -374,7 +378,9 @@ function detailScreen(entry) {
         align: 'left', size: 11, color: palette.rose,
       });
       text(
-        launchable ? 'SPACE OR TAP TO PLAY · Q TO CABINET' : 'SUSPENDED · Q TO CABINET',
+        launchable
+          ? 'SPACE OR TAP TO PLAY · Q TO CABINET'
+          : `${blockReason.toUpperCase()} · Q TO CABINET`,
         W / 2,
         438,
         { size: 14, color: launchable ? accent : palette.rose, bold: true },

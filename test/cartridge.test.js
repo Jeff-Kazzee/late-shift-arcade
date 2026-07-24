@@ -7,8 +7,13 @@ import {
   validateManifest,
 } from '../shell/cartridge.js';
 
+// Identity is declared here, not read back from the instance the factory
+// returns. The manifest is the claim; the cartridge must match it.
 const DETAILS = {
   schemaVersion: 1,
+  slug: 'test-cart',
+  title: 'Test Cart',
+  summary: 'A cartridge for contract tests.',
   version: '1.0.0',
   creator: 'Late Shift Arcade',
   runtime: 'first-party-2d',
@@ -96,7 +101,10 @@ test('activateCartridge destroys a partially initialised cartridge and rethrows 
 
 test('validateCatalog accepts unique entries and rejects malformed or duplicate versions', () => {
   const first = defineCartridge(() => makeCartridge(), DETAILS);
-  const second = defineCartridge(() => makeCartridge({ id: 'second-cart' }), DETAILS);
+  const second = defineCartridge(() => makeCartridge({ id: 'second-cart' }), {
+    ...DETAILS,
+    slug: 'second-cart',
+  });
 
   assert.deepEqual(validateCatalog([first, second]), [first, second]);
   assert.throws(() => validateCatalog([first, first]), /Duplicate cartridge version: test-cart@1\.0\.0/);
@@ -183,18 +191,32 @@ test('activateCartridge rejects invalid, suspended, and unsupported runtime entr
     suspendedCreates += 1;
     return makeCartridge();
   }, { ...DETAILS, releaseStatus: 'suspended' });
-  assert.equal(suspendedCreates, 1);
+  // Never executed: a cartridge the gate would refuse must not run its factory
+  // just because it was defined. A gate that fires after the code already ran
+  // is not a gate.
+  assert.equal(suspendedCreates, 0);
   assert.throws(() => activateCartridge(suspended, {}), /launch blocked: suspended/);
-  assert.equal(suspendedCreates, 1);
+  assert.equal(suspendedCreates, 0);
 
   let isolatedCreates = 0;
   const isolated = defineCartridge(() => {
     isolatedCreates += 1;
     return makeCartridge();
   }, { ...DETAILS, runtime: 'first-party-3d' });
-  assert.equal(isolatedCreates, 1);
+  assert.equal(isolatedCreates, 0);
   assert.throws(() => activateCartridge(isolated, {}), /runtime unavailable: first-party-3d/);
-  assert.equal(isolatedCreates, 1);
+  assert.equal(isolatedCreates, 0);
+
+  // The case that matters once community cartridges exist: untrusted code must
+  // not execute on the platform origin at catalog-definition time.
+  let communityCreates = 0;
+  const community = defineCartridge(() => {
+    communityCreates += 1;
+    return makeCartridge();
+  }, { ...DETAILS, runtime: 'community-iframe', trustLevel: 'untrusted-community' });
+  assert.equal(communityCreates, 0);
+  assert.throws(() => activateCartridge(community, {}), /runtime unavailable: community-iframe/);
+  assert.equal(communityCreates, 0);
 });
 
 test('fresh instances must retain the manifest identity established by the probe', () => {
@@ -205,4 +227,73 @@ test('fresh instances must retain the manifest identity established by the probe
   }, DETAILS);
 
   assert.throws(() => activateCartridge(entry, {}), /id must match manifest slug: test-cart/);
+});
+
+// Regression tests for the F-002 hardening pass. Each one corresponds to a
+// vulnerability demonstrated by an executable probe against the real modules,
+// not to a hypothetical.
+
+test('a manifest value that changes between reads cannot be validated as one value and stored as another', () => {
+  let reads = 0;
+  const shifty = {
+    get accent() {
+      reads += 1;
+      return reads === 1 ? 'amber' : { evil: true };
+    },
+  };
+  assert.throws(
+    () => defineCartridge(() => makeCartridge(), { ...DETAILS, artwork: shifty }),
+    /artwork/,
+  );
+});
+
+test('accent must be a real palette key, so a typo cannot ship as a silent fallback', () => {
+  assert.throws(
+    () => validateManifest({ ...DETAILS, artwork: { accent: 'perwinkle' } }),
+    /artwork\.accent is unsupported/,
+  );
+  // Inherited members are not palette keys: palette[accent] must not resolve
+  // 'toString' to a function and hand it to the renderer as a colour.
+  assert.throws(
+    () => validateManifest({ ...DETAILS, artwork: { accent: 'toString' } }),
+    /artwork\.accent is unsupported/,
+  );
+});
+
+test('versions with leading zeros are rejected so duplicate detection cannot be bypassed', () => {
+  assert.throws(
+    () => validateManifest({ ...DETAILS, version: '01.0.0' }),
+    /MAJOR\.MINOR\.PATCH without leading zeros/,
+  );
+});
+
+test('an exotic array cannot validate as a list and then be stored as a plain object', () => {
+  class Sneaky extends Array {
+    static get [Symbol.species]() {
+      return Object;
+    }
+  }
+  const tags = Sneaky.from(['a', 'b']);
+  const entry = defineCartridge(() => makeCartridge(), { ...DETAILS, tags });
+  assert.ok(Array.isArray(entry.manifest.tags), 'tags must remain a real array');
+  assert.deepEqual([...entry.manifest.tags], ['a', 'b']);
+});
+
+test('validateCatalog returns a frozen snapshot, so no entry can be appended after validation', () => {
+  const entry = defineCartridge(() => makeCartridge(), DETAILS);
+  const source = [entry];
+  const catalog = validateCatalog(source);
+
+  assert.ok(Object.isFrozen(catalog));
+  assert.throws(() => catalog.push({ manifest: { title: 'GHOST' } }), TypeError);
+  // Mutating the caller's original array must not reach the validated catalog.
+  source.push({ manifest: { title: 'GHOST' } });
+  assert.equal(catalog.length, 1);
+});
+
+test('the declared manifest is authoritative and a mismatched instance is refused', () => {
+  assert.throws(
+    () => defineCartridge(() => makeCartridge({ id: 'not-the-declared-slug' }), DETAILS),
+    /id must match manifest slug: test-cart/,
+  );
 });
