@@ -19,5 +19,5 @@ session, with hypnogram evidence cited.
 | Displacement | 3 | 2 | won s2026-07-24 expansion-plan burst: four-game emotional/verb sequence (hypnogram s2026-07-24 4–5) |
 | Day-residue | 1 | 0 | over-engineered (signal DAG); killed in revision |
 | Negation-blindness | 1 | 1 | won burst #1: screens-yield-successor shell architecture |
-| Nightmare | 0 | 0 | — |
+| Nightmare | 1 | 1 | won s2026-07-24 platform-plan review: caught false dependency chains, sandbox overclaim, and underspecified score contracts (hypnogram 10–11) |
 | Lucidity | 0 | 0 | — |

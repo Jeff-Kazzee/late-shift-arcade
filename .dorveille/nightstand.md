@@ -11,5 +11,3 @@ every WATCH and N3: promote to a block, file to memory, or delete.
 - CPU opponents (pong, air hockey) are tuned for a present player; both are
   brutal against an idle one. Fine, but difficulty selection is a possible
   future block.
-- Runner-up from the expansion architecture burst: seeded shift recipes
-  could add daily/challenge variants after the eight-game rack is proven.
