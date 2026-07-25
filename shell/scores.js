@@ -4,6 +4,11 @@
 
 export const MAX_ENTRIES = 5;
 
+// The most a single run can be worth anywhere a score travels — the table,
+// the share artifact, a dare fragment. Far above any real cartridge economy;
+// a bound on untrusted and runaway values, not a target.
+export const MAX_SCORE = 999_999_999;
+
 export function sanitizeInitials(raw) {
   const letters = String(raw ?? '').toUpperCase().replace(/[^A-Z]/g, '');
   return (letters + 'AAA').slice(0, 3);
