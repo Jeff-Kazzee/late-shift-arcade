@@ -47,7 +47,10 @@ function jsonLd(data) {
 
 const uniqueSorted = (values) => [...new Set(values)].sort((a, b) => a.localeCompare(b));
 
-function metaBlock({ title, description, canonicalUrl, ogType }) {
+// Social cards are committed PNGs pressed by tools/generate-og-cards.mjs;
+// og:image must be absolute (scrapers resolve nothing), so it hangs off
+// SITE_BASE like every other absolute URL on the site.
+function metaBlock({ title, description, canonicalUrl, ogType, ogImage, ogImageAlt }) {
   return `  <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b0c14">
@@ -59,9 +62,14 @@ function metaBlock({ title, description, canonicalUrl, ogType }) {
   <meta property="og:title" content="${escapeHtml(title)}">
   <meta property="og:description" content="${escapeHtml(description)}">
   <meta property="og:url" content="${escapeHtml(canonicalUrl)}">
-  <meta name="twitter:card" content="summary">
+  <meta property="og:image" content="${escapeHtml(ogImage)}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="${escapeHtml(ogImageAlt)}">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="${escapeHtml(title)}">
   <meta name="twitter:description" content="${escapeHtml(description)}">
+  <meta name="twitter:image" content="${escapeHtml(ogImage)}">
   <link rel="icon" href="${FAVICON}">`;
 }
 
@@ -158,7 +166,14 @@ export function renderHomePage(manifests) {
 <html lang="en">
 ${GENERATED_NOTE}
 <head>
-${metaBlock({ title, description, canonicalUrl: SITE_BASE, ogType: 'website' })}
+${metaBlock({
+  title,
+  description,
+  canonicalUrl: SITE_BASE,
+  ogType: 'website',
+  ogImage: `${SITE_BASE}assets/og/site.png`,
+  ogImageAlt: `${SITE_NAME} — open all night. Free browser arcade.`,
+})}
   <link rel="stylesheet" href="shell/site.css">
   <script type="application/ld+json">
 ${structuredData}
@@ -288,7 +303,14 @@ export function renderDetailPage(manifest) {
 <html lang="en">
 ${GENERATED_NOTE}
 <head>
-${metaBlock({ title, description, canonicalUrl, ogType: 'website' })}
+${metaBlock({
+  title,
+  description,
+  canonicalUrl,
+  ogType: 'website',
+  ogImage: `${SITE_BASE}assets/og/${manifest.slug}.png`,
+  ogImageAlt: `${manifest.title} — ${manifest.genre} game card, ${SITE_NAME}`,
+})}
   <link rel="stylesheet" href="${prefix}shell/site.css">
   <script type="application/ld+json">
 ${detailStructuredData(manifest, canonicalUrl, description)}

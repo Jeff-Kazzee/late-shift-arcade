@@ -60,9 +60,25 @@ test('detail pages carry per-game title, description, canonical, social cards, a
     assert.ok(page.includes('<meta name="description"'));
     assert.ok(page.includes(`<link rel="canonical" href="${canonical}">`));
     assert.ok(page.includes('<meta property="og:title"'));
-    assert.ok(page.includes('<meta name="twitter:card" content="summary">'));
+    assert.ok(page.includes('<meta name="twitter:card" content="summary_large_image">'));
     assert.ok(page.includes('"@type": "VideoGame"'));
     assert.ok(page.includes(`"softwareVersion": "${manifest.version}"`));
+  }
+});
+
+test('every page carries an absolute og:image and twitter:image pointing at its committed card', () => {
+  const home = renderHomePage(manifests);
+  assert.ok(home.includes(`<meta property="og:image" content="${SITE_BASE}assets/og/site.png">`));
+  assert.ok(home.includes(`<meta name="twitter:image" content="${SITE_BASE}assets/og/site.png">`));
+  for (const manifest of manifests) {
+    const page = renderDetailPage(manifest);
+    const image = `${SITE_BASE}assets/og/${manifest.slug}.png`;
+    assert.ok(page.includes(`<meta property="og:image" content="${image}">`), `${manifest.slug} og:image`);
+    assert.ok(page.includes('<meta property="og:image:width" content="1200">'));
+    assert.ok(page.includes('<meta property="og:image:height" content="630">'));
+    assert.ok(page.includes('<meta property="og:image:alt"'));
+    assert.ok(page.includes(`<meta name="twitter:image" content="${image}">`), `${manifest.slug} twitter:image`);
+    assert.ok(image.startsWith('https://'), 'og:image must be an absolute URL');
   }
 });
 
