@@ -96,3 +96,5 @@ s2026-07-24 53 [DAWN] resume after the second loss - re-read ask, dev state, tic
 s2026-07-24 54 [WAKE] Vault Heist built synchronously and merged; rack at 12, 258 tests. Synchronous dispatch survived where eight background runs had died
 s2026-07-24 55 [WATCH] cost held against the ask - every game so far was built at Showcase tier, including ones meant to be library filler. The two-tier bar was decided and then never used; that is the whole reason each small game cost 60-100 minutes
 s2026-07-24 56 [N3] replay 258/258; DEEPSHIFT GDD and its feasibility teardown rescued from temp into docs/ and committed; games-stream handoff written with the tier rule and the synchronous-dispatch rule
+s2026-07-24 57 [WATCH] owner reframed - the site cannot be indexed and that outranks more games. W-001 was identified as the core problem at session start, approved as first priority, then never started while five games were built. Sequencing miss owned, not explained away
+s2026-07-24 58 [N3] W-001 brief written to docs/ and the resume handoff rewritten to route a fresh session at the website block; rack 12 games / 258 tests; prod frozen; Pages still on main
