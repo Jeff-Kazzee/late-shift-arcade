@@ -53,12 +53,21 @@ weight the game is meant to carry.
 | 3 | Creature Forge Arena | Showcase | Proves the persistent creator artifact |
 | 4 | Dead Air Dispatch | Showcase | Proves private two-player rooms |
 | 5 | Ragdoll Relay | Shorts | Physics toy with a clear finish line |
-| 6 | Foldspace | Shorts | Authored puzzles; small content set to start |
-| 7 | Backpack Alchemist | Shorts | Ticket G-020, briefed and ready |
-| 8 | Evidence Board | Shorts | Ticket G-014, briefed and ready |
-| 9 | Ghost Frequency | Shorts | Ticket G-017, briefed and ready |
-| 10 | Wildfire Watch | Shorts | Systems puzzle, single scenario to start |
-| 11 | Last Light Foundry | Shorts | Single contract to start |
+| 6 | ~~Foldspace~~ | — | Parked 2026-07-25: owner is done with puzzles |
+| 7 | Backpack Alchemist | Shorts | Built and racked |
+| 8 | Evidence Board | Shorts | Built and racked |
+| 9 | Ghost Frequency | Shorts | Built and racked |
+| 10 | ~~Wildfire Watch~~ | — | Parked 2026-07-25: owner is done with puzzles |
+| 11 | ~~Last Light Foundry~~ | — | Parked 2026-07-25: owner is done with puzzles |
+
+**Taste redirect (owner, 2026-07-25): "I'm tired of puzzles. We need
+shoot-em-ups... classic arcade games and flight simulators and Minecraft
+and just anything that can run fucking insanely well."** The three parked
+puzzles are replaced in Batch B, count unchanged, by three action Shorts:
+**GRAVEYARD SHIFT** (twin-stick arena, Robotron lineage), **STRATOFIRE**
+(momentum dogfighter, Luftrausers lineage), **NEON TIDE** (horizontal
+shmup, Gradius lineage). "Runs insanely well" is a bar, not a vibe: pooled
+entities, no hot-loop allocation, headless stress proofs.
 
 ## 4. Seven new Arcade Shorts — approved in direction (2026-07-25, "finish them up"); Jeff may still kill or swap any individual concept
 
@@ -67,16 +76,23 @@ catalogue is expected to cover, and each is one mechanic with an obvious goal.
 
 | Game | Hook | Fills |
 | --- | --- | --- |
-| **Night Shift Diner** | Serve a rush from a cramped counter; every order is a timer you chose to start | Timing / management |
-| **Solder** | Trace a circuit before the current arrives; wrong path burns the board | Tracing puzzle — also a cheap rehearsal for Runewire |
+| **Night Shift Diner** | Serve a rush from a cramped counter; every order is a timer you chose to start | Timing / action-management |
+| **VECTOR DAWN** | Pseudo-3D rail shooter over a scrolling grid-horizon; sprite-scaling speed, lock-ons, weave the towers | AfterBurner / Space Harrier lineage |
+| **DROPSHAFT** | Tube shooter descending a well; enemies crawl the walls up at you | Tempest lineage |
+| **NIGHTLIFT** | Side-scroll wrap-world rescue: lift stranded workers out before the swarm carries them off | Defender lineage |
 | **Freight Elevator** | Stack unstable cargo up a shaft; balance is the only score | Stacking physics |
-| **Cipher Desk** | Break a short daily code from frequency and crib clues | Word / logic, daily-challenge shaped |
 | **Static** | Match an escalating audio-visual pattern; the trace is the score | Rhythm / reaction |
 | **Repo Run** | One-button rooftop runner with a combo built on near-misses | One-button platformer |
-| **Blackout Bridge** | Route limited power to keep districts alive as demand spikes | Tower-defence-lite / routing |
 
-Kill any of these freely — they are proposals, not commitments. Seven is the
-number required to hit 30; the specific seven are negotiable.
+Revised 2026-07-25 for the action redirect: Solder, Cipher Desk, and
+Blackout Bridge are killed (puzzles). Kill any of the rest freely — seven
+is the number, the specific seven stay negotiable.
+
+**Also greenlit as a concept (owner asked for flight simulators):** a real
+3D arcade flight game — working name **OPEN SKIES** — as a Showcase
+`first-party-3d` cartridge riding the three.js seam DS-1a proved. Ticket
+to be written once DS-1c lands; a true flight sim deserves the 3D class,
+not a canvas fake.
 
 ## 5. DEEPSHIFT is first, and it is gated
 

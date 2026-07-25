@@ -90,6 +90,10 @@ contract:
   practical.
 - Support keyboard/pointer and touch for every playable game. Add controller
   support when it materially improves the game.
+- Action titles must run insanely well (owner bar, 2026-07-25): pool
+  bullets/enemies/particles, no per-frame allocation in hot loops, and ship
+  a headless entity-stress test (hundreds of live entities, bounded step
+  time) alongside the winnable/losable proof.
 - Test pure game logic with `node --test`. N3 replay runs `npm test` plus the
   verification required by the active ticket.
 - Every new public game must satisfy the canonical **complete-game** and
