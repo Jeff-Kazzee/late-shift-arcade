@@ -21,3 +21,10 @@ session, with hypnogram evidence cited.
 | Negation-blindness | 2 | 1 | F-002 launch-permit branch informed fail-closed validation and runtime gates (hypnogram 38–42) |
 | Nightmare | 3 | 2 | F-002 exposed future cross-version score contamination and transferred it to F-003 without changing Legacy score keys (hypnogram 41–43) |
 | Lucidity | 3 | 1 | F-002 separated serializable metadata from runtime capability; separate binding map remained the runner-up (hypnogram 38–39) |
+
+## s2026-07-24 self-tune
+
+Adversarial bot proofs are a Showcase tool, not a default. Evidence: the proof
+caught a hollow game once (Rail Switch, hypnogram 51) and thereafter cost
+60-100 minutes per game on titles that never needed it. Demand it for headline
+releases; for Arcade Shorts a headless winnable-and-losable check is enough.

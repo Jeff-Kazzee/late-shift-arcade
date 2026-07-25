@@ -93,3 +93,6 @@ s2026-07-24 50 [WAKE] hardening landed: probe-gated execution, declared manifest
 s2026-07-24 51 [WAKE] F-008 game package boundary merged - manifests load without game code, cartridges lazy-load, registry 135 lines to 38. Pinball, Rail Switch, Orbital Salvage built and merged; rack at 11, 199 tests
 s2026-07-24 52 [GAP] two waves of four background game agents lost to host process exits with nothing pushed; the second wave carried an explicit commit-incrementally instruction and still landed nothing. Same failure, same approach, twice
 s2026-07-24 53 [DAWN] resume after the second loss - re-read ask, dev state, tickets, and night table as a stranger; dev intact at 11 games and 199 tests; no work salvageable from either wave
+s2026-07-24 54 [WAKE] Vault Heist built synchronously and merged; rack at 12, 258 tests. Synchronous dispatch survived where eight background runs had died
+s2026-07-24 55 [WATCH] cost held against the ask - every game so far was built at Showcase tier, including ones meant to be library filler. The two-tier bar was decided and then never used; that is the whole reason each small game cost 60-100 minutes
+s2026-07-24 56 [N3] replay 258/258; DEEPSHIFT GDD and its feasibility teardown rescued from temp into docs/ and committed; games-stream handoff written with the tier rule and the synchronous-dispatch rule
