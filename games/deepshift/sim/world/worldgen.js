@@ -121,7 +121,10 @@ function patchMaterial(seed, x, z) {
 // --- surface outcrops: the reachable-quota guarantee ---
 
 // One optional outcrop per 16x16 lattice cell: { x, z, material } giving
-// the min corner of a 2x2 footprint, 2 deep, whose top replaces the turf.
+// the min corner of a 2x2 footprint, 3 deep (12 ore), whose top replaces
+// the turf. Richer than a buried §6.4 vein on purpose: outcrops are the
+// solvability device that makes the 300-value quota honestly reachable
+// inside a 9:30 run.
 export function outcropAt(seed, cellX, cellZ) {
   return memoized(`o:${seed}:${cellX},${cellZ}`, () => {
     const h = hashInts(hashInts(seed, [STAGE_OUTCROP]), [cellX, cellZ]);
@@ -131,7 +134,7 @@ export function outcropAt(seed, cellX, cellZ) {
     return {
       x: cellX * size + (bits % (size - 2)),
       z: cellZ * size + (((bits >> 8) & 0xff) % (size - 2)),
-      material: ((bits >> 16) & 0xff) % 5 < 3 ? 'copper_ore' : 'coal_ore', // 60/40 copper
+      material: ((bits >> 16) & 0xff) % 10 < 7 ? 'copper_ore' : 'coal_ore', // 70/30 copper
     };
   });
 }
@@ -277,7 +280,7 @@ export function generateChunk(seed, cx, cy, cz) {
           id = 'worldbone';
         } else if (border) {
           if (wy < WALL_TOP) id = 'wardwall';
-        } else if (outcrop !== null && (wy === h - 1 || wy === h - 2)) {
+        } else if (outcrop !== null && wy >= h - 3 && wy <= h - 1) {
           id = outcrop; // the visible vein breaking the turf
         } else if (wy < h - RULESET.dirtDepth - 1) {
           id = 'fieldstone';
