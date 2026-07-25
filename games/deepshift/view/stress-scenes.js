@@ -262,7 +262,7 @@ export function fortressScene() {
     name: 'fortress',
     base,
     baseUniform,
-    anchor: { x: 320.5, y: 66, z: 320.5 },
+    anchor: { x: 320.5, y: 100, z: 320.5 },
     seedHex: null,
   });
 }
