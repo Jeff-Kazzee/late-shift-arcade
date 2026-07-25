@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://jeff-kazzee.github.io/late-shift-arcade/sitemap.xml
