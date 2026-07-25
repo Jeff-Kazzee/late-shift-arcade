@@ -33,8 +33,8 @@ replay advances a circuit on desktop and freezes it on a phone.
    sim-facing API has no residency setter, no radius parameter, and no
    camera handle, so a renderer *cannot express* a residency opinion.
    No floats, no libm, anywhere in the activation predicate.
-3. **Provinces** (Runewire regions): a province is active iff every chunk
-   of the province intersecting `ActiveSet` per rule 2 — and a circuit
+3. **Provinces** (Runewire regions): a province is active iff **every one
+   of its chunks** is in `ActiveSet` per rule 2 — and a circuit
    spanning provinces runs only when **all** member provinces are active
    (GDD §11.2.4 retained, now deterministic on every device). Frozen means
    frozen: no settlement/catch-up on thaw. Thaw and freeze occur only at

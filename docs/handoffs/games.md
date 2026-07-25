@@ -15,12 +15,29 @@ Current truth, overwritten at every block close. Branch: `dev`.
   DEEPSHIFT is the owner-stated flagship priority; its next action is **DS-0**,
   a paper-only design block resolving the two critical feasibility findings.
 
+## DS-1a: DONE (2026-07-24 late) — merged to dev
+
+The DEEPSHIFT kernel exists and its determinism is proven three ways: the
+same seed+command log reaches the identical per-tick hash in the Node
+verifier CLI, in node --test, and in the browser. 59 tests; suite at 410.
+Q16.16 fixed point throughout sim (conventions in `games/deepshift/README.md`),
+D1 activation conformance fixture golden in CI, vendored three.js (~188KB gz,
+no build step), playable one-resource/one-enemy graybox behind the cartridge
+boundary.
+
+**DEEPSHIFT is deliberately NOT in the registry yet**: it is an engine
+slice, not a public game, and `launchBlockReason` still blocks
+`first-party-3d` (a pinned test documents this). Racking happens at DS-1c
+with a real shell-gate ticket for the 3D trust class, plus a 3D-aware
+generate-pages template.
+
 ## Next unblocked block
 
-**DS-1a** — the DEEPSHIFT deterministic kernel + voxel core, per
-`docs/DS-0-DECISIONS.md` (which is binding) and the GDD. Owner's word
-2026-07-24: the flagship outranks further Shorts batches. Batch A is done
-and racked (15 games); Batch B waits behind DEEPSHIFT progress.
+**DS-1b** — streaming/edit/light/remesh stress on the shelf 2020 Android,
+per `docs/DS-0-DECISIONS.md` D4: measured budget numbers, mesh-job snapshot
+contract with halos and stale rejection, adversarial-geometry fixtures,
+one mesh worker on mobile to start. Needs the physical device — coordinate
+with Jeff. Batch B (four Shorts) remains queued behind DEEPSHIFT progress.
 
 The tier rule and all dispatch rules are in `AGENTS.md` ("Dispatch rules") —
 they are mandatory, not advisory. Package format: `games/<slug>/` holding
