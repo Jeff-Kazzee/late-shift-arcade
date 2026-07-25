@@ -1,7 +1,14 @@
 # Path to 30 games
 
-Status: proposed slate and build order
-Date: 2026-07-24
+Status: approved slate and build order
+Date: 2026-07-24 (launch bar amended 2026-07-25)
+
+**The launch bar, in the owner's words (2026-07-25): the arcade is not
+"completely live" until DEEPSHIFT is a finished, full game.** Incremental
+releases to prod continue as blessed, but no launch/announcement posture is
+"done" before DEEPSHIFT ships whole. Operationally: a DEEPSHIFT slice is
+always in flight — Shorts batches only ever occupy a second, idle slot,
+never the DEEPSHIFT slot.
 Owner decision needed on §4 (the seven new concepts) before those are built.
 
 The rack holds **12**. This is how it reaches 30, in what order, at which tier,

@@ -2,6 +2,13 @@
 
 Current truth, overwritten at every block close. Branch: `dev`.
 
+**Standing owner priority (2026-07-25): DEEPSHIFT is finished before the
+arcade counts as completely live. Keep a DEEPSHIFT slice in flight at all
+times; everything else is second-slot work. The full game is the GDD's
+scope — after DS-1b: DS-1c First Night (the real playable game), then
+DS-2 save/resume, DS-3 Deep Run, DS-4 Runewire, DS-5 release gate (where
+the deferred mobile budgets return), DS-6 showcase.**
+
 ## State
 
 - **15 games in the rack, 351 tests green.** Pong, Breakout, Air Hockey,
