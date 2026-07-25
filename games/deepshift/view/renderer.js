@@ -39,7 +39,8 @@ const SECTIONS_PER_AXIS = CHUNK / SECTION_SIZE; // 2
 // Per-frame budgets: streaming snapshot time and result-apply count. These
 // pace presentation work only — the sim never waits on any of them.
 const STREAM_BUDGET_MS = 3;
-const APPLY_MAX_RESULTS = 64;
+const APPLY_MAX_RESULTS = 32;
+const REBUILD_BUDGET_MS = 4;
 
 function boundsOf(region) {
   return {
@@ -241,8 +242,15 @@ export function createWorldRenderer({ canvas, meshTransports }) {
       loadQueue.shift();
     }
     pool.drain(applyResult, { maxResults: APPLY_MAX_RESULTS });
-    for (const chunkKey of dirtyChunks) rebuildChunkGeometry(chunkKey);
-    dirtyChunks.clear();
+    // Chunk re-merges are budgeted too: under churn a burst can dirty
+    // dozens of chunks, and each merge is a typed-array concat + GPU
+    // upload. Whatever misses the budget carries to the next frame.
+    const rebuildStart = now();
+    for (const chunkKey of dirtyChunks) {
+      rebuildChunkGeometry(chunkKey);
+      dirtyChunks.delete(chunkKey);
+      if (now() - rebuildStart >= REBUILD_BUDGET_MS) break;
+    }
   }
 
   function retargetAnchor(view, cx, cz) {

@@ -31,15 +31,17 @@ const SECTION = 16;
 // markDirty mirrors sim/world/world.js exactly: an edit on a section face
 // dirties the neighbor whose visible faces it changes.
 function editableWorld({ name, base, baseUniform, anchor, seedHex }) {
-  const overlay = new Map();
+  const overlay = new Map(); // numeric voxel key -> block id
   const editedSections = new Set();
   let dirty = {};
+  // Numeric overlay keys: snapshot capture reads this millions of times
+  // and string keys allocate; the +1/+8 offsets keep halo reads positive.
+  const voxelKey = (x, y, z) => ((y + 8) * 648 + (z + 4)) * 648 + (x + 4);
 
   const readBlock = (x, y, z) => {
-    // Snapshot capture reads this millions of times: skip the overlay
-    // lookup (and its key allocation) entirely until churn begins.
+    // Skip the overlay lookup entirely until churn begins.
     if (overlay.size !== 0) {
-      const edited = overlay.get(`${x},${y},${z}`);
+      const edited = overlay.get(voxelKey(x, y, z));
       if (edited !== undefined) return edited;
     }
     return base(x, y, z);
@@ -79,7 +81,7 @@ function editableWorld({ name, base, baseUniform, anchor, seedHex }) {
     readBlock,
     sectionUniform,
     setBlock(x, y, z, id) {
-      overlay.set(`${x},${y},${z}`, id);
+      overlay.set(voxelKey(x, y, z), id);
       editedSections.add(`${floorDiv(x, SECTION)},${floorDiv(y, SECTION)},${floorDiv(z, SECTION)}`);
       markDirty(x, y, z);
     },
