@@ -26,6 +26,10 @@ import { manifest as orbitalSalvage } from './orbital-salvage/manifest.js';
 import { manifest as evidenceBoard } from './evidence-board/manifest.js';
 import { manifest as backpackAlchemist } from './backpack-alchemist/manifest.js';
 import { manifest as ghostFrequency } from './ghost-frequency/manifest.js';
+import { manifest as graveyardShift } from './graveyard-shift/manifest.js';
+import { manifest as stratofire } from './stratofire/manifest.js';
+import { manifest as neonTide } from './neon-tide/manifest.js';
+import { manifest as ragdollRelay } from './ragdoll-relay/manifest.js';
 
 // Pixel Life's module and tests live on in games/pixel-life; it left the
 // rack when GALAXY RAID took slot five (2026-07-23). An unlisted folder is
@@ -63,5 +67,15 @@ export const cartridges = validateCatalog([
   defineCatalogEntry(
     ghostFrequency,
     lazyModule('./ghost-frequency/ghost-frequency.js', import.meta.url),
+  ),
+  defineCatalogEntry(
+    graveyardShift,
+    lazyModule('./graveyard-shift/graveyard-shift.js', import.meta.url),
+  ),
+  defineCatalogEntry(stratofire, lazyModule('./stratofire/stratofire.js', import.meta.url)),
+  defineCatalogEntry(neonTide, lazyModule('./neon-tide/neon-tide.js', import.meta.url)),
+  defineCatalogEntry(
+    ragdollRelay,
+    lazyModule('./ragdoll-relay/ragdoll-relay.js', import.meta.url),
   ),
 ]);
