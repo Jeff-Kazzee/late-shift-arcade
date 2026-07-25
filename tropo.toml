@@ -64,7 +64,6 @@ exclude = [
   "shell/site.css",
   "shell/site.js",
   "sitemap.xml",
-  "skills/dorveille",
   "docs/archive",
   "planning",
   "relay",

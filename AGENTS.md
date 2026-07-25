@@ -13,7 +13,7 @@ Read only:
 3. The one product, game-design, change, or Relay task linked from `STATE.md`.
 
 Do not preload `tickets.md`, `GAME_ROADMAP.md`, every GDD, old handoffs, archived
-Dorveille state, or sibling worktrees. Git and passing checks outrank prose that
+process state, or sibling worktrees. Git and passing checks outrank prose that
 claims a branch is current.
 
 ## Authority and system boundaries
@@ -27,11 +27,6 @@ claims a branch is current.
   not define a game's fun, and a technical design does not replace a GDD.
 - **Git owns code and branch truth.** Never call an uncommitted or unmerged change
   complete.
-- **Dorveille is optional reflection only.** Invoke it only when Jeff explicitly
-  asks to sleep on, dream-pass, or adversarially reconsider a decision. It does
-  not control sessions, hooks, chips, agents, branches, worktrees, memory, or
-  completion.
-
 One fact gets one owner. Link to it elsewhere instead of copying it.
 
 ## Development method

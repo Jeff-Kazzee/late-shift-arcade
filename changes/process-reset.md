@@ -1,7 +1,7 @@
 ---
 project: late-shift-arcade
 status: done
-slice: replace the Dorveille runtime with Vivary truth, Relay handoffs, finite game bets, and worktree closeout
+slice: remove the Dorveille runtime and establish Vivary truth, Relay handoffs, finite game bets, and worktree closeout
 branch: feat/process-reset
 related_modules: [agent-workspace, product, game-development]
 verification: [process-reset-verification]
@@ -13,8 +13,7 @@ This slice:
 
 - adopts the current Vivary coding scaffold without overwriting the existing repository;
 - installs project-local Vivary and Agent Relay tooling;
-- removes Dorveille's automatic SessionStart injection;
-- reduces Dorveille to explicit one-pass reflection;
+- removes Dorveille's automatic SessionStart injection and local skill;
 - establishes a platform PRD, a reusable GDD, and a finite DEEPSHIFT bet;
 - adds an auditable worktree closeout tool;
 - leaves one Relay task for Fable or Opus to recover active work.

@@ -9,17 +9,16 @@ Status:
 - `feat/process-reset` adopts Vivary 0.3.1 and Agent Relay 0.1.0.
 - The stale merged `late-shift-arcade-w001` worktree and local branch were
   removed on 2026-07-25.
-- Two Claude-owned worktrees remain active and dirty. They must be banked,
-  reviewed, integrated or parked, and then removed before new feature work.
-- Dorveille is no longer mandatory. Its SessionStart hook is disabled, its
-  history is archived under `docs/archive/dorveille/`, and its local skill is
-  reflection-only.
+- Two Claude-owned worktrees remain: DEEPSHIFT is locked and dirty; Batch B is
+  clean and unlocked but still needs review, integration or parking, and removal.
+- Dorveille has been removed from the active project. Its old runtime history is
+  preserved under `docs/archive/dorveille/` as non-authoritative evidence only.
 
 Next:
 
 1. Give `relay/tasks/0001-process-reset-and-recover-active-work.md` to the
    Fable or Opus orchestrator currently holding the active Claude process.
-2. Recover the DEEPSHIFT and Batch B work without adding features.
+2. Bank DEEPSHIFT, then review and either integrate or park Batch B.
 3. Close both temporary worktrees using `scripts/worktree-closeout.ps1`.
 4. Review and merge `feat/process-reset` into `dev`.
 5. Choose the first finite product bet from the platform wayfinder map.
@@ -33,8 +32,6 @@ Open decisions:
 Blockers:
 
 - `feat/ds-1c-first-night` has modified uncommitted files.
-- `feat/g-batch-b` has an untracked `games/ragdoll-relay/` folder and is based
-  on stale history.
 
 Checks:
 

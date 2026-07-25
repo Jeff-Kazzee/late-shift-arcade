@@ -200,8 +200,8 @@ file reading and code writing and report back conclusions, not file dumps.
 
 ### Session handoff
 
-The existing dorveille handoff protocol stays. Each stream keeps its own handoff
-file so streams can resume independently, inside the repository:
+Each stream keeps its own handoff file so streams can resume independently,
+inside the repository:
 
 ```
 docs/handoffs/<stream>.md      # contract | site | games | platform

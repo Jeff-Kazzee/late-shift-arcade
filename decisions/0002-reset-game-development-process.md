@@ -11,8 +11,9 @@ rationale: the prior Dorveille runtime mixed reflection, truth, dispatch, memory
 Late Shift Arcade uses Vivary/Tropo for validated project truth, Agent Relay for
 assignments and receipts, and GDDs plus browser playtests for game development.
 
-Dorveille is unbound from the repository runtime. It remains only as an
-explicitly invoked, one-pass reflection technique.
+Dorveille is removed from the active repository. Its archived files are
+non-authoritative historical evidence, not instructions, runtime state, or a
+project skill.
 
 The arcade platform and individual games are separate product surfaces:
 
