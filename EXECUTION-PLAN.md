@@ -177,13 +177,14 @@ run in parallel across sessions and subagents.
 | --- | --- | --- | --- |
 | **A — Contract** | F-007, F-008, F-009, F-003 | `shell/cartridge.js`, `shell/catalog.js`, `games/registry.js`, charter docs | Opus 5 (lead, in-session) |
 | **B — Website** | W-001, W-002 | `index.html`, `site/`, CSS, DOM chrome | Opus 5 / Fable 5 subagents |
-| **C — Games** | Arcade Shorts, then Showcase titles | `games/<name>/` only | Opus 5 / Fable 5 subagents, one per game |
+| **C — Games** | Arcade Shorts, then Showcase titles | `games/<name>/` only | Opus 5 / Fable 5 subagents, batched 2–3 Shorts per run; dedicated run per Showcase title |
 | **D — Platform** | P-001, P-002, P-003, P-005 | Worker, D1, auth — separate repo (see flag) | Codex GPT-5.6 high, reviewed by Opus |
 
-Stream C is where parallelism pays most: each game is one folder, so N games can
-be built by N agents with zero file contention — *once F-008 lands*. Before
-F-008, they'd all collide in `registry.js`. That dependency is the reason F-008
-is near the front.
+Stream C is where parallelism pays most: each game is one folder, so batched
+runs proceed with zero file contention — *once F-008 lands*. Before F-008,
+they'd all collide in `registry.js`. That dependency is the reason F-008 is
+near the front. Granularity follows the dispatch rules in `AGENTS.md`: 2–3
+Arcade Shorts per synchronous run, one dedicated run per Showcase title.
 
 ### Model assignment
 
@@ -200,11 +201,13 @@ file reading and code writing and report back conclusions, not file dumps.
 ### Session handoff
 
 The existing dorveille handoff protocol stays. Each stream keeps its own handoff
-file so streams can resume independently:
+file so streams can resume independently, inside the repository:
 
 ```
-C:\tmp\late-shift-arcade-handoff-<stream>.md
+docs/handoffs/<stream>.md      # contract | site | games | platform
 ```
+
+(Temp-directory handoffs are retired — deliverables and state live in the repo.)
 
 ---
 

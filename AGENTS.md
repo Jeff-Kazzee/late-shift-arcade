@@ -10,10 +10,13 @@ for the stream you are working in with current worktree truth and exactly one
 next unblocked ticket. Stop before starting that ticket so a fresh session can
 resume one block at a time.
 
-Handoff files live outside the repository, one per stream, named
-`late-shift-arcade-handoff-<stream>.md` in the machine's temp directory. Do not
-date-stamp the filename — a handoff is current truth that gets overwritten, not
-an archive. See `EXECUTION-PLAN.md` for the stream list.
+Handoff files live in the repository at `docs/handoffs/<stream>.md`, one per
+stream — the slugs are `contract`, `site`, `games`, and `platform`, matching
+streams A–D in `EXECUTION-PLAN.md`. Do not date-stamp the filename — a handoff
+is current truth that gets overwritten, not an archive.
+Handoffs used to live in the machine's temp directory; two major documents
+nearly vanished from there, and one session's state survived only because
+`dev` happened to be pushed. Nothing load-bearing lives outside the repo.
 
 ## Branches and release
 
@@ -25,6 +28,28 @@ site, and it advances only when Jeff explicitly decides to make a release live.
 Do not merge, push, fast-forward, or open a pull request into `prod`, and do not
 treat a green suite or a finished ticket as permission to. The site going public
 is a product decision, not a build step.
+
+## Dispatch rules
+
+Paid for with eight lost agent-runs and a rack built at ten times its cost.
+None of these are optional:
+
+1. **Dispatch subagents synchronously.** Background runs die with the host
+   process and leave nothing behind. If a run is lost, change the dispatch
+   *mechanism* before dispatching again — never re-run the same wave.
+2. **Build to the assigned tier.** `docs/PATH-TO-30.md` assigns every game a
+   tier. Arcade Shorts is the default. Showcase verification — adversarial
+   bot proofs, the full browser playtest matrix — is for headliners only;
+   demanding it of library filler is the single biggest cost mistake this
+   project has made.
+3. **Batch Arcade Shorts.** One agent carries two or three small games per
+   run; one agent per small game is the wrong granularity.
+4. **Agents never edit shared files** (`games/registry.js`, `index.html`,
+   charter docs). They ship a self-contained `games/<slug>/` folder; the
+   orchestrator wires the entry.
+5. **Agents commit and push before they are finished.** A pushed half-game
+   beats an unpushed whole one.
+6. **Deliverables land in the repository, never a temp or scratchpad path.**
 
 ## Platform charter
 

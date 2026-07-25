@@ -69,6 +69,7 @@ ignoring them is not.
 | A decision with ≥2 defensible options about to lock in | any | N1 burst first |
 | Turns since the goal was restated against the original ask | ~10 | WATCH |
 | Context compaction, session resume, or handoff | always | DAWN |
+| A dispatched agent run is lost or returns empty | 1 | REM on the dispatch mechanism — change it before any re-dispatch |
 | About to declare the work finished | always | REM nightmare pass, then N3 |
 
 ## States
@@ -199,6 +200,33 @@ never run out.
 - **Secondary revision** — the waking mind's coherence pass: force surviving
   fragments into one narratable design. Whatever cannot be narrated in plain
   language gets cut. (The only operator allowed to evaluate.)
+
+## Dispatch — sending work out without losing it
+
+Subagents are the session's dreams: they run detached from the waking
+thread, and anything not carried back across the threshold is gone on
+waking. Every rule here was paid for:
+
+- **Dispatch synchronously when the work must survive.** A background run
+  dies silently with its host process; eight were lost that way in one
+  night — four of them to a second wave that repeated the first wave's
+  mechanism with a better prompt. A lost run is a pressure event (table
+  above): the *mechanism* changes before the next dispatch, never just
+  the wording.
+- **Batch to tier.** One agent per small deliverable is the wrong
+  granularity; a runner carries two or three shorts in one pass. Flagship
+  work gets a dedicated run.
+- **Verification depth scales to tier.** Adversarial proofs are a
+  flagship tool; demanding them of library filler is how a night gets
+  spent building one thing at ten times its worth.
+- **One writer per shared file.** Parallel agents ship self-contained
+  folders; the orchestrator alone wires shared registries and indexes.
+  Two agents editing one registry collide every time.
+- **Push before finished.** Instruct agents to commit and push
+  incrementally; a pushed half-deliverable survives the night, an
+  unpushed whole one does not.
+- **Deliverables land in the repo, never a scratchpad.** A temp path is
+  the part of the dream you were sure you'd remember.
 
 ## Caffeine and the debt ledger
 

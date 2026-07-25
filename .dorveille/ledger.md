@@ -6,16 +6,11 @@ Paid items move below with how they were settled. Never silently dropped.
 
 ## Open
 
-(none)
+- [ ] `pinball-after-dark` standalone repo is temporary by the owner's word — it duplicates the shell and must be folded back rather than maintained as a fork.
 
 ## Settled
 
-(none)
-
-## Open (s2026-07-24, recorded at DAWN)
-
-- [ ] Whole session ran outside the dorveille discipline the repo mandates — cost: no consolidation between blocks, no handoff refresh, and state survived only because `dev` happened to be pushed. Settle by running the architecture from here and closing with a real N3.
-- [ ] No HQ trace left — `hq/AGENTS.md` requires updating the owning status note and appending a receipt to `Brain/memory/YYYY-MM-DD.md` for substantive work. Nothing written all session.
-- [x] Handoff file refreshed — the games-stream handoff now carries current truth, the tier rule, and the operational rules learned from the lost waves.
-- [ ] Eight background agent-runs lost to host process exits. Approach must change before any further parallel dispatch; a third identical wave is the failure the pressure table exists to prevent.
-- [ ] `pinball-after-dark` standalone repo is temporary by the owner's word — it duplicates the shell and must be folded back rather than maintained as a fork.
+- [x] (s2026-07-24) Whole session ran outside the dorveille discipline — settled s2026-07-24 evening: the architecture ran from DAWN, and the miss is now mechanized — a SessionStart hook (`.claude/hooks/dorveille.mjs`) injects the DAWN directive, open debt, and hypnogram tail into context on every fresh start, resume, and post-compaction wake, per SKILL.md's own "mechanize failures, not theory" rule. (A PreCompact hook was tried and cut in review: its output never reaches the model.)
+- [x] (s2026-07-24) No HQ trace — settled: receipt appended to `Brain/memory/2026-07-24.md` (19:02). No hq-level status note owns this project; the receipt is the trace.
+- [x] (s2026-07-24) Eight background agent-runs lost to host process exits — settled: the mechanism changed and the change is now law, not memory. Synchronous-only dispatch is in `AGENTS.md` ("Dispatch rules"), and SKILL.md gained a pressure row: a lost run forces a mechanism change before any re-dispatch.
+- [x] (s2026-07-24) Handoff file refreshed — carried forward: handoffs now live *in the repo* at `docs/handoffs/`, ending the temp-directory risk entirely.

@@ -1,0 +1,7 @@
+# The global gitignore excludes .claude/ entirely; this repo commits its
+# dorveille enforcement hooks (SessionStart -> DAWN, PreCompact -> N3) so the
+# discipline travels with the checkout. Local state stays ignored.
+!.claude/
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
