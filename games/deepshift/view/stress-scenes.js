@@ -27,19 +27,6 @@ export const SCENE_REGION = Object.freeze({
 
 const SECTION = 16;
 
-function latticeNoise(seed, tag) {
-  const memo = new Map();
-  return (...coords) => {
-    const key = coords.join(',');
-    let v = memo.get(key);
-    if (v === undefined) {
-      v = Number(hashInts(hashInts(seed, [tag]), coords) & 0xffn);
-      memo.set(key, v);
-    }
-    return v;
-  };
-}
-
 // Editable overlay + dirty-section bookkeeping over a pure base function.
 // markDirty mirrors sim/world/world.js exactly: an edit on a section face
 // dirties the neighbor whose visible faces it changes.
@@ -49,8 +36,13 @@ function editableWorld({ name, base, baseUniform, anchor, seedHex }) {
   let dirty = {};
 
   const readBlock = (x, y, z) => {
-    const edited = overlay.get(`${x},${y},${z}`);
-    return edited !== undefined ? edited : base(x, y, z);
+    // Snapshot capture reads this millions of times: skip the overlay
+    // lookup (and its key allocation) entirely until churn begins.
+    if (overlay.size !== 0) {
+      const edited = overlay.get(`${x},${y},${z}`);
+      if (edited !== undefined) return edited;
+    }
+    return base(x, y, z);
   };
 
   const sectionUniform = (sx, sy, sz) => (
@@ -130,41 +122,78 @@ export function checkerboardScene() {
 // voids expose interior faces in nearly every underground section.
 export function cavesScene(seedHex = '00000000deadbeef') {
   const seed = BigInt(`0x${seedHex}`);
-  const height2 = latticeNoise(seed, 11);
-  const cave3 = latticeNoise(seed, 13);
   const HSTEP = 24;
   const CSTEP = 8;
-  const CAVE_THRESHOLD = 74; // ~29% of lattice space carves
+  const NY = SCENE_REGION.blocksY / CSTEP; // 12 vertical cave-lattice cells
+  const CAVE_THRESHOLD = 105; // ~30% of interpolated space carves
+
+  // Snapshot capture is the hot path (per-voxel, millions of calls), so
+  // everything expensive is cached per COLUMN with numeric keys: surface
+  // height, and the cave-density profile at the 13 vertical lattice rows —
+  // per voxel that leaves one linear interpolation.
+  const lat2 = new Map(); // height lattice hash
+  const lat3 = new Map(); // cave lattice hash
+  const heights = new Map(); // column -> surface height
+  const densities = new Map(); // column -> Float64Array(NY + 1)
+  const colKey = (x, z) => x * 4096 + z;
+
+  const h2 = (lx, lz) => {
+    const k = lx * 4096 + lz;
+    let v = lat2.get(k);
+    if (v === undefined) {
+      v = Number(hashInts(seed, [11, lx, lz]) & 0xffn);
+      lat2.set(k, v);
+    }
+    return v;
+  };
+  const c3 = (lx, ly, lz) => {
+    const k = (lx * 4096 + lz) * 16 + ly;
+    let v = lat3.get(k);
+    if (v === undefined) {
+      v = Number(hashInts(seed, [13, lx, ly, lz]) & 0xffn);
+      lat3.set(k, v);
+    }
+    return v;
+  };
 
   const columnHeight = (x, z) => {
+    const k = colKey(x, z);
+    let h = heights.get(k);
+    if (h !== undefined) return h;
     const lx = floorDiv(x, HSTEP);
     const lz = floorDiv(z, HSTEP);
     const fx = (x - lx * HSTEP) / HSTEP;
     const fz = (z - lz * HSTEP) / HSTEP;
-    const h00 = height2(lx, lz);
-    const h10 = height2(lx + 1, lz);
-    const h01 = height2(lx, lz + 1);
-    const h11 = height2(lx + 1, lz + 1);
-    const top = (1 - fx) * ((1 - fz) * h00 + fz * h01) + fx * ((1 - fz) * h10 + fz * h11);
-    return 40 + Math.floor((top / 256) * 24); // 40..63
+    const top = (1 - fx) * ((1 - fz) * h2(lx, lz) + fz * h2(lx, lz + 1))
+      + fx * ((1 - fz) * h2(lx + 1, lz) + fz * h2(lx + 1, lz + 1));
+    h = 40 + Math.floor((top / 256) * 24); // 40..63
+    heights.set(k, h);
+    return h;
+  };
+
+  const densityColumn = (x, z) => {
+    const k = colKey(x, z);
+    let col = densities.get(k);
+    if (col !== undefined) return col;
+    const lx = floorDiv(x, CSTEP);
+    const lz = floorDiv(z, CSTEP);
+    const fx = (x - lx * CSTEP) / CSTEP;
+    const fz = (z - lz * CSTEP) / CSTEP;
+    col = new Float64Array(NY + 1);
+    for (let ly = 0; ly <= NY; ly += 1) {
+      col[ly] = (1 - fx) * ((1 - fz) * c3(lx, ly, lz) + fz * c3(lx, ly, lz + 1))
+        + fx * ((1 - fz) * c3(lx + 1, ly, lz) + fz * c3(lx + 1, ly, lz + 1));
+    }
+    densities.set(k, col);
+    return col;
   };
 
   const caveAt = (x, y, z) => {
     if (y < 8) return false; // a floor the caves never breach
-    const lx = floorDiv(x, CSTEP);
+    const col = densityColumn(x, z);
     const ly = floorDiv(y, CSTEP);
-    const lz = floorDiv(z, CSTEP);
-    const fx = (x - lx * CSTEP) / CSTEP;
     const fy = (y - ly * CSTEP) / CSTEP;
-    const fz = (z - lz * CSTEP) / CSTEP;
-    const c = (dx, dy, dz) => cave3(lx + dx, ly + dy, lz + dz);
-    const n00 = (1 - fx) * c(0, 0, 0) + fx * c(1, 0, 0);
-    const n10 = (1 - fx) * c(0, 1, 0) + fx * c(1, 1, 0);
-    const n01 = (1 - fx) * c(0, 0, 1) + fx * c(1, 0, 1);
-    const n11 = (1 - fx) * c(0, 1, 1) + fx * c(1, 1, 1);
-    const n0 = (1 - fy) * n00 + fy * n10;
-    const n1 = (1 - fy) * n01 + fy * n11;
-    return (1 - fz) * n0 + fz * n1 < CAVE_THRESHOLD;
+    return col[ly] * (1 - fy) + col[ly + 1] * fy < CAVE_THRESHOLD;
   };
 
   const base = (x, y, z) => {

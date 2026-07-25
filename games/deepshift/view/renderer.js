@@ -39,7 +39,6 @@ const SECTIONS_PER_AXIS = CHUNK / SECTION_SIZE; // 2
 // Per-frame budgets: streaming snapshot time and result-apply count. These
 // pace presentation work only — the sim never waits on any of them.
 const STREAM_BUDGET_MS = 3;
-const STREAM_MAX_COLUMNS = 8;
 const APPLY_MAX_RESULTS = 64;
 
 function boundsOf(region) {
@@ -228,11 +227,18 @@ export function createWorldRenderer({ canvas, meshTransports }) {
     const bounds = boundsOf(view.snap.region);
     lastBounds = bounds;
     const started = now();
-    let columns = 0;
-    while (loadQueue.length > 0 && columns < STREAM_MAX_COLUMNS && now() - started < STREAM_BUDGET_MS) {
-      const [cx, cz] = loadQueue.shift();
-      for (let cy = 0; cy < bounds.chunksY; cy += 1) streamChunk(view, cx, cy, cz);
-      columns += 1;
+    // Budget is checked per CHUNK (not per column): an adversarial column
+    // can cost tens of milliseconds to snapshot, so a column may finish
+    // across several frames. The first chunk each frame always streams,
+    // guaranteeing progress under any budget.
+    streaming: while (loadQueue.length > 0) {
+      const [cx, cz] = loadQueue[0];
+      for (let cy = 0; cy < bounds.chunksY; cy += 1) {
+        if (streamed.has(`${cx},${cy},${cz}`)) continue;
+        if (now() - started >= STREAM_BUDGET_MS) break streaming;
+        streamChunk(view, cx, cy, cz);
+      }
+      loadQueue.shift();
     }
     pool.drain(applyResult, { maxResults: APPLY_MAX_RESULTS });
     for (const chunkKey of dirtyChunks) rebuildChunkGeometry(chunkKey);
