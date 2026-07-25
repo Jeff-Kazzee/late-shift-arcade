@@ -4,6 +4,7 @@ import {
   activateCartridge,
   defineCatalogEntry,
   lazyModule,
+  requiredOrientation,
   validateCatalog,
   validateManifest,
 } from '../shell/cartridge.js';
@@ -400,4 +401,25 @@ test('the declared manifest is authoritative and a mismatched module is refused'
     defineTestEntry(() => makeCartridge({ id: 'not-the-declared-slug' })).load(),
     /id must match manifest slug: test-cart/,
   );
+});
+
+test('orientation is optional, validated when present, and defaults to landscape', () => {
+  // Absent: valid, and the shared 640×480 cabinet default applies.
+  const absent = validateManifest({ ...DETAILS });
+  assert.equal(requiredOrientation(absent), 'landscape');
+
+  // Present and supported: kept as declared.
+  const declared = validateManifest({ ...DETAILS, orientation: 'any' });
+  assert.equal(requiredOrientation(declared), 'any');
+  assert.equal(
+    requiredOrientation(validateManifest({ ...DETAILS, orientation: 'landscape' })),
+    'landscape',
+  );
+
+  // Present and malformed: refused, not silently defaulted.
+  assert.throws(
+    () => validateManifest({ ...DETAILS, orientation: 'portrait' }),
+    /orientation is unsupported/,
+  );
+  assert.throws(() => validateManifest({ ...DETAILS, orientation: '' }), TypeError);
 });

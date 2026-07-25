@@ -43,10 +43,16 @@ const MANIFEST_FIELDS = new Set([
   'genre',
   'players',
   'tags',
+  'orientation',
 ]);
+const OPTIONAL_MANIFEST_FIELDS = new Set(['source', 'orientation']);
 const REQUIRED_MANIFEST_FIELDS = new Set(
-  [...MANIFEST_FIELDS].filter((field) => field !== 'source'),
+  [...MANIFEST_FIELDS].filter((field) => !OPTIONAL_MANIFEST_FIELDS.has(field)),
 );
+// Which way the phone has to turn for GAMEPLAY — never for browsing. Absent
+// means 'landscape': the shared cabinet is a 640×480 landscape screen, so
+// landscape is the property a game inherits unless it declares otherwise.
+const ORIENTATIONS = new Set(['landscape', 'any']);
 const ARTWORK_FIELDS = new Set(['accent']);
 // Accent is a shell palette key, so it is a contract, not free text. Validating
 // it against the real key set stops a typo shipping as a silent fallback and
@@ -187,7 +193,17 @@ export function validateManifest(manifest) {
   nonEmptyText(manifest.genre, 'genre');
   nonEmptyText(manifest.players, 'players');
   textList(manifest.tags, 'tags', { allowEmpty: true });
+  if (Object.hasOwn(manifest, 'orientation')) {
+    oneOf(manifest.orientation, 'orientation', ORIENTATIONS);
+  }
   return manifest;
+}
+
+// The orientation a manifest demands of GAMEPLAY (browsing never demands one).
+// Reads through the same default the validator documents, so pages and the
+// player cannot disagree about what an absent field means.
+export function requiredOrientation(manifest) {
+  return manifest.orientation ?? 'landscape';
 }
 
 // A cartridge instance must present the identity its manifest declares, at
