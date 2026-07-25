@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<!-- DEEPSHIFT DS-1b stress harness (Gate 4). Not linked from the site, not
+     a game page: this drives the streaming renderer over the adversarial
+     scenes (view/stress-scenes.js) with scripted camera travel and edit
+     churn, and measures the GDD §13.5 DESKTOP budget numbers. Metrics are
+     exposed on window.__stress() for automated capture. -->
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0c14">
+  <title>DEEPSHIFT — DS-1b stress harness</title>
+  <meta name="robots" content="noindex">
+  <style>
+    body { margin: 0; background: #0b0c14; color: #f2ead9; font: 14px/1.5 system-ui, sans-serif; }
+    main { max-width: 1200px; margin: 0 auto; padding: 12px 16px; }
+    h1 { font-size: 18px; letter-spacing: 0.08em; margin: 6px 0 10px; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; align-items: center; }
+    button, select { background: #10121d; color: #f2ead9; border: 1px solid #e6c17e;
+      border-radius: 6px; padding: 7px 12px; font: inherit; }
+    label { display: inline-flex; align-items: center; gap: 6px; }
+    .stage { width: 100%; height: 62vh; background: #06070c; border: 1px solid #2a2c3c;
+      border-radius: 8px; overflow: hidden; position: relative; }
+    .stage canvas { width: 100%; height: 100%; display: block; }
+    .metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 8px; margin-top: 10px; font-family: ui-monospace, monospace; font-size: 12px; }
+    .metric { background: #10121d; border: 1px solid #2a2c3c; border-radius: 6px; padding: 8px 10px; }
+    .metric b { display: block; font-size: 16px; margin-top: 2px; color: #e6c17e; }
+    .metric.bad b { color: #e06a6a; }
+    .metric.good b { color: #7ec27e; }
+    .note { opacity: 0.7; font-size: 12px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>DEEPSHIFT DS-1b — streaming / churn stress (desktop §13.5)</h1>
+    <div class="toolbar">
+      <label>scene
+        <select data-scene>
+          <option value="caves">caves</option>
+          <option value="fortress">fortress</option>
+          <option value="checkerboard">checkerboard</option>
+        </select>
+      </label>
+      <button type="button" data-start>Start</button>
+      <button type="button" data-stop disabled>Stop</button>
+      <label><input type="checkbox" data-churn> edit churn</label>
+      <label><input type="checkbox" data-travel checked> camera travel</label>
+      <button type="button" data-reset>Reset stats window</button>
+    </div>
+    <div class="stage" data-stage></div>
+    <div class="metrics" data-metrics></div>
+    <p class="note">
+      Budgets (GDD §13.5 desktop): p95 frame ≤ 16.7 ms · draws ≤ 600 ·
+      triangles ≤ 1.2M · resident meshes ≤ 1,000 · view radius 8.
+      Authoritative activation is untouched by any of this — these scenes are
+      render-only worlds; frozen-but-visible is the normal case.
+      Automated capture: <code>window.__stress()</code>,
+      <code>window.__stressReset()</code>.
+    </p>
+  </main>
+
+  <script type="module">
+    import { SCENES } from './view/stress-scenes.js';
+    import { applyBurst } from './view/churn.js';
+    import { createWorldRenderer } from './view/renderer.js';
+    import { RENDER_RADIUS } from './view/render-set.js';
+
+    const $ = (sel) => document.querySelector(sel);
+    const stage = $('[data-stage]');
+    const metricsBox = $('[data-metrics]');
+    const TURN = 4096;
+
+    let scene = null;
+    let view = null;
+    let renderer = null;
+    let canvas = null;
+    let raf = 0;
+    let startedAt = 0;
+    let statsSince = 0;
+    let lastTime = 0;
+    let frameMs = [];
+    let burst = 0;
+    let frameIndex = 0;
+    let ttfpMs = null;
+    let lastInfo = { calls: 0, triangles: 0, geometries: 0 };
+    let lastMetrics = null;
+    const CHURN_SEED = 0xc0ffeen;
+
+    function percentile(sorted, p) {
+      if (sorted.length === 0) return 0;
+      const i = Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length));
+      return sorted[i];
+    }
+
+    function computeMetrics() {
+      if (renderer === null) return null;
+      const sorted = [...frameMs].sort((a, b) => a - b);
+      const pool = renderer.debug.poolStats();
+      const lat = [...pool.latencies].sort((a, b) => a - b);
+      const heap = performance.memory ? performance.memory.usedJSHeapSize : null;
+      return {
+        scene: scene.name,
+        renderRadius: RENDER_RADIUS,
+        elapsedMs: Math.round(performance.now() - startedAt),
+        statsWindowMs: Math.round(performance.now() - statsSince),
+        frames: frameMs.length,
+        frameMsP50: percentile(sorted, 50),
+        frameMsP95: percentile(sorted, 95),
+        frameMsP99: percentile(sorted, 99),
+        fps: frameMs.length > 0 ? 1000 / (sorted.reduce((a, b) => a + b, 0) / sorted.length) : 0,
+        drawCalls: lastInfo.calls,
+        triangles: lastInfo.triangles,
+        gpuGeometries: lastInfo.geometries,
+        residentChunkMeshes: renderer.debug.chunkMeshCount(),
+        residentSections: renderer.debug.sectionCount(),
+        streamedChunks: renderer.debug.streamedChunkCount(),
+        loadQueue: renderer.debug.loadQueueLength(),
+        ttfpMs,
+        churnBursts: burst,
+        edits: scene.editCount(),
+        remeshLatencyP50: percentile(lat, 50),
+        remeshLatencyP95: percentile(lat, 95),
+        pool: {
+          submitted: pool.submitted, dispatched: pool.dispatched, applied: pool.applied,
+          rejectedStale: pool.rejectedStale, coalesced: pool.coalesced,
+          queued: pool.queued, inFlight: pool.inFlight,
+          inFlightBytes: pool.inFlightBytes, pendingResultBytes: pool.pendingResultBytes,
+          peakInFlightBytes: pool.peakInFlightBytes, peakPendingResultBytes: pool.peakPendingResultBytes,
+          transports: pool.transports,
+        },
+        jsHeapBytes: heap,
+      };
+    }
+
+    function renderMetrics(m) {
+      if (m === null) return;
+      const rows = [
+        ['p95 frame ms (≤16.7)', m.frameMsP95.toFixed(2), m.frameMsP95 <= 16.7],
+        ['p50 frame ms', m.frameMsP50.toFixed(2), null],
+        ['fps (mean)', m.fps.toFixed(1), null],
+        ['draw calls (≤600)', m.drawCalls, m.drawCalls <= 600],
+        ['triangles (≤1.2M)', m.triangles.toLocaleString(), m.triangles <= 1200000],
+        ['resident meshes (≤1000)', m.residentChunkMeshes, m.residentChunkMeshes <= 1000],
+        ['streamed chunks', m.streamedChunks, null],
+        ['load queue (columns)', m.loadQueue, null],
+        ['time-to-playable ms', m.ttfpMs === null ? '…' : Math.round(m.ttfpMs), null],
+        ['remesh p95 ms', m.remeshLatencyP95.toFixed(1), null],
+        ['stale rejected', m.pool.rejectedStale, null],
+        ['coalesced', m.pool.coalesced, null],
+        ['pool in-flight / queued', `${m.pool.inFlight} / ${m.pool.queued}`, null],
+        ['peak in-flight KB', Math.round(m.pool.peakInFlightBytes / 1024), null],
+        ['peak pending KB', Math.round(m.pool.peakPendingResultBytes / 1024), null],
+        ['JS heap MB', m.jsHeapBytes === null ? 'n/a' : Math.round(m.jsHeapBytes / 1048576), null],
+        ['churn bursts / edits', `${m.churnBursts} / ${m.edits}`, null],
+      ];
+      metricsBox.innerHTML = rows.map(([k, v, ok]) => (
+        `<div class="metric${ok === null ? '' : ok ? ' good' : ' bad'}">${k}<b>${v}</b></div>`
+      )).join('');
+    }
+
+    // Scripted patrol: a lissajous path around the region center, wide
+    // enough (±200 blocks ≈ ±6 chunks) that streaming AND radius+2 unload
+    // both run continuously; the camera faces its travel direction.
+    function eyeAt(tMs) {
+      const a = scene.anchor;
+      const travel = $('[data-travel]').checked;
+      const t = travel ? tMs / 1000 : 0;
+      const x = 320 + 200 * Math.sin(0.055 * t);
+      const z = 320 + 200 * Math.sin(0.037 * t + 1.3);
+      const dx = 200 * 0.055 * Math.cos(0.055 * t);
+      const dz = 200 * 0.037 * Math.cos(0.037 * t + 1.3);
+      const yawRad = Math.atan2(dx, -dz);
+      return {
+        x: travel ? x : a.x,
+        y: a.y,
+        z: travel ? z : a.z,
+        yaw: ((yawRad * TURN) / (2 * Math.PI) + TURN) % TURN,
+        pitch: -260,
+      };
+    }
+
+    function frame(time) {
+      if (renderer === null) return;
+      if (lastTime !== 0) {
+        frameMs.push(time - lastTime);
+        if (frameMs.length > 1800) frameMs.shift();
+      }
+      lastTime = time;
+      frameIndex += 1;
+
+      const eye = eyeAt(time - startedAt);
+      if ($('[data-churn]').checked && frameIndex % 6 === 0) {
+        const center = {
+          x: Math.min(600, Math.max(40, Math.round(eye.x))),
+          y: Math.round(scene.anchor.y) - 12,
+          z: Math.min(600, Math.max(40, Math.round(eye.z))),
+        };
+        const dirty = applyBurst(scene, CHURN_SEED, burst, 24, center, 40);
+        burst += 1;
+        renderer.applyDirty(view, dirty);
+      }
+      renderer.render(view, eye, null);
+      lastInfo = renderer.debug.renderInfo();
+      if (ttfpMs === null && renderer.debug.coreComplete(3)) {
+        ttfpMs = performance.now() - startedAt;
+      }
+      if (frameIndex % 30 === 0) {
+        lastMetrics = computeMetrics();
+        renderMetrics(lastMetrics);
+      }
+      raf = requestAnimationFrame(frame);
+    }
+
+    function stop() {
+      cancelAnimationFrame(raf);
+      if (renderer !== null) renderer.dispose();
+      renderer = null;
+      scene = null;
+      view = null;
+      canvas?.remove();
+      canvas = null;
+      $('[data-stop]').disabled = true;
+      $('[data-start]').disabled = false;
+    }
+
+    function start() {
+      stop();
+      scene = SCENES[$('[data-scene]').value]();
+      view = { snap: scene.snap, readBlock: scene.readBlock, sectionUniform: scene.sectionUniform };
+      canvas = document.createElement('canvas');
+      stage.append(canvas);
+      renderer = createWorldRenderer({ canvas });
+      renderer.rebuildAll(view);
+      frameMs = [];
+      burst = 0;
+      frameIndex = 0;
+      ttfpMs = null;
+      lastTime = 0;
+      startedAt = performance.now();
+      statsSince = startedAt;
+      raf = requestAnimationFrame(frame);
+      $('[data-stop]').disabled = false;
+      $('[data-start]').disabled = true;
+    }
+
+    $('[data-start]').addEventListener('click', start);
+    $('[data-stop]').addEventListener('click', stop);
+    $('[data-reset]').addEventListener('click', () => {
+      frameMs = [];
+      statsSince = performance.now();
+    });
+
+    window.__stress = () => computeMetrics();
+    window.__stressReset = () => { frameMs = []; statsSince = performance.now(); };
+  </script>
+</body>
+</html>
