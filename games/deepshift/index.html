@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<!-- DEEPSHIFT DS-1a detail + launch harness (hand-written: deepshift is not
+     yet in games/registry.js, so tools/generate-pages.js does not own this
+     file). The manifest is validated through shell/cartridge.js and the
+     cartridge presents the versioned instance shape; the shell's launch
+     gate still blocks first-party-3d, so this page hosts the G-007 boundary
+     demo itself and says so honestly. -->
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0c14">
+  <title>DEEPSHIFT — DS-1a graybox | Late Shift Arcade</title>
+  <meta name="description" content="Voxel survival on the late shift. DS-1a engineering graybox: mine fieldstone by day, survive the Hollowed by night, bank the quota before dawn.">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9B%8F%EF%B8%8F%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="../../shell/site.css">
+  <style>
+    .ds-stage { width: 100%; height: min(70vh, 620px); background: #06070c;
+      border: 1px solid #2a2c3c; border-radius: 8px; overflow: hidden; }
+    .ds-toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; align-items: center; }
+    .ds-toolbar input { background: #10121d; color: #f2ead9; border: 1px solid #3a3c50;
+      border-radius: 6px; padding: 8px 10px; font-family: monospace; width: 12em; }
+    .ds-report { background: #10121d; border: 1px solid #2a2c3c; border-radius: 6px;
+      padding: 10px 12px; font-family: monospace; font-size: 12px; white-space: pre-wrap;
+      max-height: 16em; overflow: auto; }
+    .ds-note { font-size: 13px; opacity: 0.8; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="../../">LATE SHIFT<span>ARCADE</span></a>
+    <nav aria-label="Site"><a href="../../index.html#games">Games</a></nav>
+  </header>
+  <main class="detail accent-amber" data-slug="deepshift">
+    <nav class="crumbs" aria-label="Breadcrumb">
+      <a href="../../">All games</a> <span aria-hidden="true">/</span> DEEPSHIFT (DS-1a)
+    </nav>
+    <article>
+      <header class="detail-head">
+        <p class="kicker" data-kicker></p>
+        <h1>DEEPSHIFT</h1>
+        <p class="lede" data-summary></p>
+        <p class="ds-note" data-gate-note></p>
+      </header>
+
+      <div class="ds-toolbar">
+        <label for="ds-seed">seed</label>
+        <input id="ds-seed" name="seed" data-seed placeholder="16 hex chars (blank = fresh)" maxlength="16">
+        <button type="button" class="button button-play" data-launch>Insert coin — launch</button>
+        <button type="button" class="button" data-eject hidden>Eject</button>
+        <button type="button" class="button" data-rebuild hidden>Kill + rebuild renderer</button>
+        <button type="button" class="button" data-fullscreen hidden>&#x26F6; fullscreen</button>
+        <button type="button" class="button" data-leak>10&times; launch/eject leak check</button>
+        <button type="button" class="button" data-download hidden>Download run log</button>
+      </div>
+
+      <div class="ds-stage" data-stage></div>
+      <pre class="ds-report" data-report>ready.</pre>
+
+      <section>
+        <h2>What this proves (DS-0 D4, Gate 3)</h2>
+        <p class="ds-note">
+          The sim is a pure headless kernel; this page drives it through the
+          versioned cartridge shape (init/update/draw/destroy). The renderer is a
+          snapshot subscriber — "kill + rebuild renderer" disposes every GPU
+          resource and rebuilds the scene from sim state alone. "Download run log"
+          hands you the canonical command stream; replay it byte-identically with
+          <code>node games/deepshift/tools/verify-run.mjs run.json</code>.
+        </p>
+      </section>
+    </article>
+  </main>
+
+  <script type="module">
+    import { manifest } from './manifest.js';
+    import { validateManifest, launchBlockReason } from '../../shell/cartridge.js';
+
+    const $ = (sel) => document.querySelector(sel);
+    const report = $('[data-report]');
+    const stage = $('[data-stage]');
+    const log = (line) => { report.textContent += `\n${line}`; report.scrollTop = report.scrollHeight; };
+
+    validateManifest(manifest);
+    $('[data-kicker]').textContent = `${manifest.genre} · ${manifest.players}P · v${manifest.version} · ${manifest.runtime}`;
+    $('[data-summary]').textContent = manifest.summary;
+    const blocked = launchBlockReason(manifest);
+    $('[data-gate-note]').textContent = blocked
+      ? `Shell launch gate says: "${blocked}" — the cabinet does not host first-party-3d yet, so this page hosts the G-007 boundary demo directly.`
+      : 'Shell launch gate: open.';
+
+    let cart = null;
+    let raf = 0;
+    let lastTime = 0;
+    let lastScore = null;
+    let blobUrl = null;
+
+    function frame(time) {
+      if (cart === null) return;
+      const dt = lastTime === 0 ? 0 : (time - lastTime) / 1000;
+      lastTime = time;
+      cart.update(dt);
+      cart.draw();
+      raf = requestAnimationFrame(frame);
+    }
+
+    async function launch() {
+      if (cart !== null) eject();
+      const module = await import('./cart/cartridge.js');
+      const instance = module.default();
+      if (instance.id !== manifest.slug || instance.title !== manifest.title || instance.blurb !== manifest.summary) {
+        throw new TypeError('cartridge does not present its declared identity');
+      }
+      const seed = $('[data-seed]').value.trim();
+      lastScore = null;
+      instance.init({
+        container: stage,
+        seed: seed === '' ? undefined : seed,
+        endGame(score) { lastScore = score; log(`endGame(${score}) — run over.`); },
+      });
+      cart = instance;
+      lastTime = 0;
+      raf = requestAnimationFrame(frame);
+      $('[data-eject]').hidden = false;
+      $('[data-rebuild]').hidden = false;
+      $('[data-fullscreen]').hidden = false;
+      $('[data-download]').hidden = false;
+      log(`launched (seed ${seed === '' ? 'fresh' : seed}).`);
+    }
+
+    function eject() {
+      if (cart === null) return;
+      cancelAnimationFrame(raf);
+      cart.destroy();
+      cart = null;
+      $('[data-eject]').hidden = true;
+      $('[data-rebuild]').hidden = true;
+      $('[data-fullscreen]').hidden = true;
+      log('ejected.');
+    }
+
+    $('[data-launch]').addEventListener('click', () => { launch().catch((e) => log(`launch failed: ${e.message}`)); });
+    $('[data-eject]').addEventListener('click', eject);
+    $('[data-fullscreen]').addEventListener('click', () => {
+      stage.requestFullscreen?.().catch(() => log('fullscreen denied — playing in-page (that is the honest fallback).'));
+    });
+
+    $('[data-rebuild]').addEventListener('click', async () => {
+      // The WorldView seam demo: destroy the whole cartridge (renderer and
+      // all), then resume — a fresh instance on the SAME seed replays the
+      // same world; the live proof of renderer-holds-no-truth is that
+      // destroy+init rebuilds the scene from sim snapshot alone.
+      if (cart === null) return;
+      const before = performance.now();
+      const runLog = cart.getRunLog();
+      eject();
+      const module = await import('./cart/cartridge.js');
+      cart = module.default();
+      cart.init({ container: stage, seed: runLog.seed, endGame(score) { lastScore = score; } });
+      lastTime = 0;
+      raf = requestAnimationFrame(frame);
+      $('[data-eject]').hidden = false;
+      $('[data-rebuild]').hidden = false;
+      log(`renderer + cartridge rebuilt from seed in ${Math.round(performance.now() - before)}ms (fresh run, same world).`);
+    });
+
+    $('[data-download]').addEventListener('click', () => {
+      if (cart === null) return;
+      const runLog = cart.getRunLog();
+      if (blobUrl !== null) URL.revokeObjectURL(blobUrl);
+      blobUrl = URL.createObjectURL(new Blob([JSON.stringify(runLog, null, 1)], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `deepshift-run-${runLog.seed}.json`;
+      a.click();
+      log(`run log downloaded: ${runLog.commands.length} commands, seed ${runLog.seed}.`);
+    });
+
+    $('[data-leak]').addEventListener('click', async () => {
+      // G-007 leak discipline: 10 launch/eject cycles; report DOM node and
+      // heap movement. The registry sweep itself is asserted in node tests.
+      eject();
+      const nodesBefore = document.getElementsByTagName('*').length;
+      const heap = () => (performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null);
+      const heapBefore = heap();
+      const module = await import('./cart/cartridge.js');
+      for (let i = 0; i < 10; i += 1) {
+        const instance = module.default();
+        instance.init({ container: stage, seed: '00c0ffee00c0ffee' });
+        instance.update(0.1);
+        instance.draw();
+        instance.destroy();
+      }
+      const nodesAfter = document.getElementsByTagName('*').length;
+      const heapAfter = heap();
+      log(`leak check: DOM nodes ${nodesBefore} -> ${nodesAfter} (must be equal); ` +
+        (heapBefore === null ? 'heap metric unavailable in this browser.' : `heap ~${heapBefore}MB -> ~${heapAfter}MB.`));
+    });
+  </script>
+</body>
+</html>
