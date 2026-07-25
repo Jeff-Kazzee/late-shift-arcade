@@ -1,5 +1,5 @@
-// Deterministic fixed-point direction math. GDD §5.2/§13.2 bans Math.sin/cos
-// in the sim (implementation-defined per engine); we ship our own integer
+// Deterministic fixed-point direction math. GDD §5.2/§13.2 bans the
+// built-in trig (implementation-defined per engine); we ship our own integer
 // approximation instead. Angles are quantized: a full turn = 4096 units
 // (ANGLE_TURN), which is also the look-command quantization step.
 //
