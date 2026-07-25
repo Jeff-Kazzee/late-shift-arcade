@@ -23,6 +23,9 @@ import { manifest as vaultHeist } from './vault-heist/manifest.js';
 import { manifest as pinballAfterDark } from './pinball-after-dark/manifest.js';
 import { manifest as railSwitch } from './rail-switch/manifest.js';
 import { manifest as orbitalSalvage } from './orbital-salvage/manifest.js';
+import { manifest as evidenceBoard } from './evidence-board/manifest.js';
+import { manifest as backpackAlchemist } from './backpack-alchemist/manifest.js';
+import { manifest as ghostFrequency } from './ghost-frequency/manifest.js';
 
 // Pixel Life's module and tests live on in games/pixel-life; it left the
 // rack when GALAXY RAID took slot five (2026-07-23). An unlisted folder is
@@ -49,4 +52,16 @@ export const cartridges = validateCatalog([
     lazyModule('./orbital-salvage/orbital-salvage.js', import.meta.url),
   ),
   defineCatalogEntry(vaultHeist, lazyModule('./vault-heist/vault-heist.js', import.meta.url)),
+  defineCatalogEntry(
+    evidenceBoard,
+    lazyModule('./evidence-board/evidence-board.js', import.meta.url),
+  ),
+  defineCatalogEntry(
+    backpackAlchemist,
+    lazyModule('./backpack-alchemist/backpack-alchemist.js', import.meta.url),
+  ),
+  defineCatalogEntry(
+    ghostFrequency,
+    lazyModule('./ghost-frequency/ghost-frequency.js', import.meta.url),
+  ),
 ]);
