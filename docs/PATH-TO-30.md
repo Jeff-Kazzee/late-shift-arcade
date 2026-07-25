@@ -53,7 +53,7 @@ weight the game is meant to carry.
 | 10 | Wildfire Watch | Shorts | Systems puzzle, single scenario to start |
 | 11 | Last Light Foundry | Shorts | Single contract to start |
 
-## 4. Seven new Arcade Shorts — proposed, needs Jeff's nod
+## 4. Seven new Arcade Shorts — approved in direction (2026-07-25, "finish them up"); Jeff may still kill or swap any individual concept
 
 The rack is heavy on physics and action. These fill genre gaps a browser
 catalogue is expected to cover, and each is one mechanic with an obvious goal.
