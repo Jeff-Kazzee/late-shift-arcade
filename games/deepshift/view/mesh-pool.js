@@ -81,27 +81,28 @@ export function createMeshPool({
   function pump() {
     if (pumping || disposed) return;
     pumping = true;
-    let progressed = true;
-    while (progressed) {
-      progressed = false;
+    for (;;) {
       if (queued.size === 0) break;
       if (inFlight.size >= maxInFlight) break;
-      if (inFlightBytes >= maxInFlightBytes) break;
-      if (pendingResultBytes >= maxPendingResultBytes) break;
-      for (const [key, entry] of queued) {
-        if (inFlight.has(key)) continue; // one in-flight job per key
-        queued.delete(key);
-        const slot = pickSlot();
-        inFlight.set(key, { bytes: entry.snapshot.bytes, submittedAt: entry.submittedAt, slot });
-        inFlightBytes += entry.snapshot.bytes;
-        slotLoad[slot] += 1;
-        counters.dispatched += 1;
-        if (inFlight.size > counters.peakInFlight) counters.peakInFlight = inFlight.size;
-        if (inFlightBytes > counters.peakInFlightBytes) counters.peakInFlightBytes = inFlightBytes;
-        transports[slot].post(entry.snapshot); // may deliver synchronously
-        progressed = true;
-        break; // re-evaluate every cap before the next dispatch
+      if (pendingResultBytes >= maxPendingResultBytes) break; // output backpressure
+      let key = null;
+      let entry = null;
+      for (const [k, e] of queued) {
+        if (!inFlight.has(k)) { key = k; entry = e; break; } // one in-flight job per key
       }
+      if (key === null) break;
+      // The input-byte cap is never exceeded — except that a job larger
+      // than the whole cap may fly ALONE, so nothing can deadlock.
+      if (inFlight.size > 0 && inFlightBytes + entry.snapshot.bytes > maxInFlightBytes) break;
+      queued.delete(key);
+      const slot = pickSlot();
+      inFlight.set(key, { bytes: entry.snapshot.bytes, submittedAt: entry.submittedAt, slot });
+      inFlightBytes += entry.snapshot.bytes;
+      slotLoad[slot] += 1;
+      counters.dispatched += 1;
+      if (inFlight.size > counters.peakInFlight) counters.peakInFlight = inFlight.size;
+      if (inFlightBytes > counters.peakInFlightBytes) counters.peakInFlightBytes = inFlightBytes;
+      transports[slot].post(entry.snapshot); // may deliver synchronously (inline transport)
     }
     pumping = false;
   }
