@@ -85,6 +85,19 @@ export function setBlock(world, x, y, z, id) {
   markDirty(world, x, y, z);
 }
 
+// Renderer-facing fast path: if the 16^3 section lives in a uniform chunk,
+// return that single block id (a uniform-air section can be skipped by a
+// mesher outright); otherwise null. Read-only, purely derived.
+export function sectionUniformBlock(world, sx, sy, sz) {
+  const cx = floorDiv(sx * SECTION, CHUNK_SIZE);
+  const cy = floorDiv(sy * SECTION, CHUNK_SIZE);
+  const cz = floorDiv(sz * SECTION, CHUNK_SIZE);
+  if (cy < 0) return 'worldbone';
+  if (cy >= REGION.chunksY) return 'air';
+  const chunk = getChunk(world, cx, cy, cz);
+  return chunk.bits === 0 ? chunk.palette[0] : null;
+}
+
 // Renderer-facing: sorted section keys touched since the last drain.
 export function drainDirtySections(world) {
   const keys = Object.keys(world.dirty).sort();
