@@ -250,6 +250,63 @@ test('wiping the recorder kills the cameras for good and books an objective', ()
   assert.equal(scoreBreakdown(after).objectives, 1);
 });
 
+// A corridor is the one place HIDE is not on the menu, so these two are the
+// only answers to a glance there. Both write straight into the detection
+// path, which is where a bug costs somebody a crew member.
+
+test('smoke kills the glance that a corridor gives you no way to duck', () => {
+  const base = newHeist(1);
+  const guard = { id: 'g1', name: 'T', route: ['atrium', 'halle'], idx: 0, room: 'atrium', alertTo: null, pause: 0 };
+  const rigged = {
+    ...base,
+    camerasDead: true,
+    guards: [guard],
+    crew: base.crew.map((c) => (c.id === 'vane' ? { ...c, room: 'atrium' } : { ...c, room: 'street' })),
+  };
+  assert.equal(room('atrium').cover, false, 'the fixture needs a room with nothing to hide behind');
+  assert.ok(!legalOrders(rigged, 'vane').some((o) => o.kind === 'hide'));
+
+  const bare = projectTurn(rigged, {});
+  assert.equal(bare.guards[0].to, 'halle');
+  assert.equal(bare.guards[0].facing, 'atrium');
+  assert.ok(bare.detections.some((d) => d.crew === 'vane'), 'the glance should reach him');
+
+  const smoked = projectTurn(rigged, { vane: { kind: 'tool', tool: 'smoke' } });
+  assert.equal(smoked.detections.length, 0, 'smoke did not break the line of sight');
+  assert.equal(smoked.next.tools.smoke, 0);
+});
+
+test('cutting the lights blinds the lenses and every glance at once', () => {
+  const base = newHeist(1);
+  const atConsole = { ...base, guards: [], crew: base.crew.map((c) => ({ ...c, room: 'maint' })) };
+  assert.equal(actionAt(atConsole, crewById(atConsole, 'spark')).kind, 'hack-lights');
+  assert.equal(actionAt(atConsole, crewById(atConsole, 'bruno')).kind, 'none', 'muscle cannot hack');
+
+  const dark = applyProjection(atConsole, projectTurn(atConsole, { spark: { kind: 'act' } }));
+  assert.equal(dark.lightsOutTurns, CFG.LIGHTS_OUT_TURNS);
+  assert.equal(camerasLive(dark), false);
+  // And it is not offered again while they are still out — a button that
+  // spends a turn and changes nothing is a trap.
+  assert.equal(actionAt(dark, crewById(dark, 'spark')).kind, 'none');
+
+  // In the dark a guard still has his own room, and nothing beyond it.
+  const guard = { id: 'g1', name: 'T', route: ['atrium', 'halle'], idx: 0, room: 'atrium', alertTo: null, pause: 0 };
+  const blind = {
+    ...base,
+    camerasDead: true,
+    lightsOutTurns: CFG.LIGHTS_OUT_TURNS,
+    guards: [guard],
+    crew: base.crew.map((c) => {
+      if (c.id === 'vane') return { ...c, room: 'atrium' };  // the room he is looking at
+      if (c.id === 'bruno') return { ...c, room: 'halle' };  // the room he walks into
+      return { ...c, room: 'street' };
+    }),
+  };
+  const seen = projectTurn(blind, {});
+  assert.ok(!seen.detections.some((d) => d.crew === 'vane'), 'the glance survived the dark');
+  assert.ok(seen.detections.some((d) => d.crew === 'bruno'), 'walking into him should still cost you');
+});
+
 // --- noise -----------------------------------------------------------------
 
 test('one guard answers a clatter and the rest keep walking their loop', () => {

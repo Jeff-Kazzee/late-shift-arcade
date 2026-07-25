@@ -639,7 +639,10 @@ export function createVaultHeist() {
     const target = state.loot.find((l) => l.target);
 
     text(`TURN ${state.turn}/${CFG.TURN_LIMIT}`, 14, 24, { align: 'left', size: 13, color: pal.cream, bold: true });
-    text(`TAKE ${terminalScore(state) || projectedScore()}`, 14, 44, {
+    // Gate on `over`, not on truthiness: a failed heist scores zero, and
+    // falling back to the running total there would print a healthy TAKE
+    // behind a SCORE 0 card.
+    text(`TAKE ${state.over ? terminalScore(state) : projectedScore()}`, 14, 44, {
       align: 'left', size: 13, color: pal.amber, bold: true,
     });
     text(`KIT ${totalTools(state.tools)}/${totalTools(state.toolsStart)}`, 14, 62, {
