@@ -51,7 +51,7 @@ export function emptyInventory() {
 }
 
 // Ore banking values (GDD §6.4 score column) and §3.4 per-material caps
-// (units per banking window; Dawn Run has a day window and a night window).
+// (units per banking bucket; Dawn Run has a day bucket and a night bucket).
 export const BANKABLE = Object.freeze([
   Object.freeze({ item: 'coal', value: 2, capUnits: 40 }),
   Object.freeze({ item: 'copper_ore', value: 5, capUnits: 30 }),

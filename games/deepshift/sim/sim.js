@@ -272,12 +272,12 @@ function applyCommand(state, cmd, journal) {
     case CMD.BANK: {
       const c = state.cache;
       if (!withinReachOfBlock(p, c.x, c.y, c.z, RULESET.reach)) return;
-      const window = isNight(state.tick) ? state.banking.night : state.banking.day;
+      const bucket = isNight(state.tick) ? state.banking.night : state.banking.day;
       for (const bank of BANKABLE) {
         const units = p.inventory[bank.item];
         if (units > 0) {
           p.inventory[bank.item] = 0;
-          window[bank.item] += units;
+          bucket[bank.item] += units;
         }
       }
       return;

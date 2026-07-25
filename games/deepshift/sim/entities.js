@@ -1,4 +1,4 @@
-// DS-1c entities: a fixed-slot POOL (AGENTS.md performance bar — no
+// DS-1c entities: a fixed-slot POOL (the AGENTS.md perf bar — no
 // allocation in the per-tick hot loop, a hard ceiling by construction) and
 // the §10 rules for the three Dusklands enemies plus the gloom dart
 // projectile.
