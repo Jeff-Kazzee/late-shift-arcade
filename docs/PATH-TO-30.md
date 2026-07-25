@@ -135,16 +135,21 @@ Learned the hard way today; ignoring these is what cost eight agent-runs.
    `logic.js` (pure sim), `<slug>.js` (cartridge, **default export**), and
    `<slug>.test.js`.
 
-## 7. Suggested sequence
+## 7. Sequence (reordered 2026-07-24 evening, owner's word)
 
-1. **Batch A** (one run, Shorts): Evidence Board, Backpack Alchemist, Ghost
-   Frequency — all three already briefed and ticketed. → 15 games
-2. **DS-0** (design block): resolve the DEEPSHIFT criticals, split DS-1.
-3. **Batch B** (one run, Shorts): Ragdoll Relay, Foldspace, Wildfire Watch,
-   Last Light Foundry → 19 games
-4. **DS-1a / DS-1b**: the DEEPSHIFT vertical slice.
-5. **Batch C** (Shorts): the seven new concepts from §4, if approved → 26 games
-6. **Showcase run**: Boss Foundry, Creature Forge Arena, Dead Air Dispatch
+Jeff's redirect: the flagship outranks further batches. DEEPSHIFT leads;
+Shorts batches ride behind it, never ahead of it again.
+
+1. ~~**Batch A**~~ — done, racked. → **15 games**
+2. ~~**DS-0**~~ — done: `docs/DS-0-DECISIONS.md` (activation policy, DSAV
+   frontier, Runewire narrowing, DS-1 split into 1a/1b/1c).
+3. **DS-1a** — the deterministic kernel + voxel core (Showcase). ← next
+4. **DS-1b / DS-1c** — shelf-device stress, then First Night content.
+5. **Batch B** (one run, Shorts, behind DEEPSHIFT): Ragdoll Relay,
+   Foldspace, Wildfire Watch, Last Light Foundry → 19 games
+6. **DS-2+** per the GDD phase plan.
+7. **Batch C** (Shorts): the seven §4 concepts, if approved → 26 games
+8. **Showcase run**: Boss Foundry, Creature Forge Arena, Dead Air Dispatch
    → 29 games, plus DEEPSHIFT → **30**
 
 Note that the website work (W-001 DOM chrome) and the player spine (accounts,

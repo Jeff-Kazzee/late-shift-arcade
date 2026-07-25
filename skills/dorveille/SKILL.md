@@ -227,6 +227,9 @@ waking. Every rule here was paid for:
   unpushed whole one does not.
 - **Deliverables land in the repo, never a scratchpad.** A temp path is
   the part of the dream you were sure you'd remember.
+- **Parallel dreams get separate beds.** Two agents in one checkout swap
+  HEAD under each other and each wakes up holding pieces of the other's
+  dream. One agent per isolated worktree, always.
 
 ## Caffeine and the debt ledger
 

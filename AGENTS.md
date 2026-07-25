@@ -50,6 +50,9 @@ None of these are optional:
 5. **Agents commit and push before they are finished.** A pushed half-game
    beats an unpushed whole one.
 6. **Deliverables land in the repository, never a temp or scratchpad path.**
+7. **Parallel agents get isolated worktrees.** Two agents sharing one
+   checkout swap HEAD under each other and cross-pollute branches — it
+   happened the first time it was tried. One agent per worktree, always.
 
 ## Platform charter
 
