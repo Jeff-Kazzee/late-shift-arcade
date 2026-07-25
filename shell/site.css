@@ -33,6 +33,10 @@
 
 * { box-sizing: border-box; }
 
+/* Filtering hides elements via the hidden attribute; nothing below may win
+ * a specificity fight against it. */
+[hidden] { display: none !important; }
+
 html {
   background: var(--ink);
   color-scheme: dark;
