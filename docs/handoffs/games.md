@@ -38,15 +38,24 @@ slice, not a public game, and `launchBlockReason` still blocks
 with a real shell-gate ticket for the 3D trust class, plus a 3D-aware
 generate-pages template.
 
-## Next unblocked block
+## DS-1b: DONE (2026-07-25) — merged to dev, suite 459
 
-**DS-1b** — streaming/edit/light/remesh stress, desktop-web first (owner's
-word: web-first, device testing later), per `docs/DS-0-DECISIONS.md` D4 as
-amended: worker meshing behind the snapshot contract (halos, revision
-cancellation, stale rejection), measured desktop budget numbers at radius 8,
-adversarial-geometry fixtures. No physical-device dependency; the mobile
-column moves to the DS-5 release gate. Batch B (four Shorts) remains queued
-behind DEEPSHIFT progress.
+Worker meshing behind the F-06 snapshot contract (stale rejection proven),
+radius-8 spiral streaming with chunk-merged draws (100-250 calls), frustum
+culling, adversarial fixtures + churn harness, honest measured numbers in
+`games/deepshift/PERF.md`. Normal terrain passes the desktop column at
+60fps; the adversarial checkerboard misses tris/heap by design — named
+follow-ups (per-chunk density backstop, upload granularity, CPU-side
+double-retention), none touching sim. Mobile column: DS-5.
+
+## In flight
+
+**DS-1c — First Night** (the real game: full Dusklands content, 3 enemies,
+day/night spawning, crafting/smelting, quota + permadeath, §3.3 score,
+DOM HUD, touch) — dispatched worktree-isolated. The "5 observed
+first-timers" acceptance line is human work and stays open for Jeff.
+**Batch B (action redirect)** — GRAVEYARD SHIFT, STRATOFIRE, NEON TIDE,
+Ragdoll Relay.
 
 The tier rule and all dispatch rules are in `AGENTS.md` ("Dispatch rules") —
 they are mandatory, not advisory. Package format: `games/<slug>/` holding
