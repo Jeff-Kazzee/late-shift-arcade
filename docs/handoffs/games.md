@@ -33,11 +33,13 @@ generate-pages template.
 
 ## Next unblocked block
 
-**DS-1b** — streaming/edit/light/remesh stress on the shelf 2020 Android,
-per `docs/DS-0-DECISIONS.md` D4: measured budget numbers, mesh-job snapshot
-contract with halos and stale rejection, adversarial-geometry fixtures,
-one mesh worker on mobile to start. Needs the physical device — coordinate
-with Jeff. Batch B (four Shorts) remains queued behind DEEPSHIFT progress.
+**DS-1b** — streaming/edit/light/remesh stress, desktop-web first (owner's
+word: web-first, device testing later), per `docs/DS-0-DECISIONS.md` D4 as
+amended: worker meshing behind the snapshot contract (halos, revision
+cancellation, stale rejection), measured desktop budget numbers at radius 8,
+adversarial-geometry fixtures. No physical-device dependency; the mobile
+column moves to the DS-5 release gate. Batch B (four Shorts) remains queued
+behind DEEPSHIFT progress.
 
 The tier rule and all dispatch rules are in `AGENTS.md` ("Dispatch rules") —
 they are mandatory, not advisory. Package format: `games/<slug>/` holding
