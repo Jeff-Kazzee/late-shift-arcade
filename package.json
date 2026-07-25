@@ -4,6 +4,12 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "brain:doctor": "create-vivary doctor . --trend",
+    "worktrees:audit": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/worktree-closeout.ps1 -Audit"
+  },
+  "devDependencies": {
+    "@the-little-ai-company/agent-relay": "latest",
+    "@vivary/create": "latest"
   }
 }

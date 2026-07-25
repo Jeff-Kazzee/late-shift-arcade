@@ -1,0 +1,126 @@
+version = 1
+exclude = [
+  ".git",
+  ".claude",
+  ".agents",
+  "templates",
+  "memory",
+  "heartbeat-reports",
+  "README.md",
+  "AGENTS.md",
+  "SOUL.md",
+  "STRATO.md",
+  "STATE.md",
+  "USER.md",
+  "MEMORY.md",
+  "bug-risk-playbook.md",
+  "EXECUTION-PLAN.md",
+  "GAME_ROADMAP.md",
+  "SPEC.md",
+  "assets/og",
+  "docs/DEEPSHIFT-GDD.md",
+  "docs/DEEPSHIFT-feasibility-review.md",
+  "docs/DS-0-DECISIONS.md",
+  "docs/PATH-TO-30.md",
+  "docs/W-001-SITE-BRIEF.md",
+  "docs/handoffs",
+  "docs/v-001-verification",
+  "docs/w-001-verification",
+  "games/air-hockey",
+  "games/asteroid-defender",
+  "games/backpack-alchemist",
+  "games/breakout",
+  "games/deepshift",
+  "games/evidence-board",
+  "games/galaxy-raid",
+  "games/ghost-frequency",
+  "games/lunar-descent",
+  "games/midnight-run",
+  "games/neon-snake",
+  "games/orbital-salvage",
+  "games/pinball-after-dark",
+  "games/pixel-life",
+  "games/pong",
+  "games/rail-switch",
+  "games/registry.js",
+  "games/vault-heist",
+  "index.html",
+  "package-lock.json",
+  "package.json",
+  "robots.txt",
+  "shell/canvas-text.js",
+  "shell/cartridge.js",
+  "shell/catalog-layout.js",
+  "shell/catalog.js",
+  "shell/crt.js",
+  "shell/input.js",
+  "shell/loop.js",
+  "shell/palette.js",
+  "shell/player.js",
+  "shell/scores.js",
+  "shell/screen.js",
+  "shell/sfx.js",
+  "shell/share.js",
+  "shell/site.css",
+  "shell/site.js",
+  "sitemap.xml",
+  "skills/dorveille",
+  "docs/archive",
+  "planning",
+  "relay",
+  "test/canvas-text.test.js",
+  "test/cartridge.test.js",
+  "test/catalog-layout.test.js",
+  "test/catalog.test.js",
+  "test/draw-smoke.test.js",
+  "test/input.test.js",
+  "test/loop.test.js",
+  "test/og-cards.test.js",
+  "test/scores.test.js",
+  "test/screen.test.js",
+  "test/share.test.js",
+  "test/site-pages.test.js",
+  "tickets.md",
+  "tools/generate-og-cards.mjs",
+  "tools/generate-pages.js",
+]
+
+[base]
+derive = ["id", "title"]
+allow_untyped = true
+optional = { tags = "string-list" }
+
+[types.module]
+folder = "modules"
+required = { project = "string", status = "enum:active|draft|blocked|archived", module_area = "string" }
+optional = { related_modules = "ref-list", related_changes = "ref-list", verification = "ref-list", gates = "ref-list", source_files = "string-list", test_files = "string-list" }
+
+[types.implementation_slice]
+folder = "changes"
+required = { project = "string", status = "enum:planned|active|done|blocked|deferred", slice = "string" }
+optional = { branch = "string", related_modules = "ref-list", related_changes = "ref-list", verification = "ref-list", gates = "ref-list" }
+
+[types.decision]
+folder = "decisions"
+required = { project = "string", status = "enum:proposed|accepted|deferred|superseded", date = "date" }
+optional = { supersedes = "ref", superseded_by = "ref", related_modules = "ref-list", related_changes = "ref-list", rationale = "string" }
+
+[types.verification]
+folder = "verification"
+required = { project = "string", status = "enum:planned|passed|failed|blocked|deferred", target = "string" }
+optional = { command = "string", evidence = "any", related_modules = "ref-list", related_changes = "ref-list" }
+
+[types.gate]
+folder = "gates"
+required = { project = "string", status = "enum:open|approved|rejected|deferred", gate = "string" }
+optional = { approver = "string", approved_at = "datetime", command_intent = "string", related_modules = "ref-list", related_changes = "ref-list" }
+
+[types.product_spec]
+folder = "product-specs"
+required = { project = "string", status = "enum:draft|active|approved|superseded", product = "string" }
+optional = { related_modules = "ref-list", related_changes = "ref-list", verification = "ref-list", gates = "ref-list" }
+
+[types.game_design]
+folder = "game-designs"
+required = { project = "string", status = "enum:draft|active|approved|superseded", game = "string" }
+optional = { related_modules = "ref-list", related_changes = "ref-list", verification = "ref-list", gates = "ref-list" }

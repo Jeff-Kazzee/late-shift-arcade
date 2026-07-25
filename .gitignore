@@ -1,7 +1,13 @@
-# The global gitignore excludes .claude/ entirely; this repo commits its
-# dorveille enforcement hooks (SessionStart -> DAWN, PreCompact -> N3) so the
-# discipline travels with the checkout. Local state stays ignored.
+# Keep only shared Claude settings. Runtime worktrees and local state stay
+# ignored.
 !.claude/
 .claude/*
 !.claude/settings.json
-!.claude/hooks/
+
+node_modules/
+USER.md
+MEMORY.md
+memory/*
+!memory/.gitkeep
+heartbeat-reports/*
+!heartbeat-reports/.gitkeep

@@ -1,117 +1,116 @@
-# Late Shift Arcade — agent instructions
+# Late Shift Arcade — agent contract
 
-This project is built under the **dorveille** discipline. Before any work,
-read `skills/dorveille/SKILL.md` and follow it for the whole session: state
-chip on every response, obey the sleep-pressure table, keep `.dorveille/`
-current. The session is not done until N3 runs.
+Late Shift Arcade is a curated browser arcade that will accept community game
+submissions. Preserve the working Legacy Rack while growing the real product in
+small, playable, reviewable releases.
 
-At the end of every WAKE block, run REM and N3, then overwrite the handoff file
-for the stream you are working in with current worktree truth and exactly one
-next unblocked ticket. Stop before starting that ticket so a fresh session can
-resume one block at a time.
+## Start here
 
-Handoff files live in the repository at `docs/handoffs/<stream>.md`, one per
-stream — the slugs are `contract`, `site`, `games`, and `platform`, matching
-streams A–D in `EXECUTION-PLAN.md`. Do not date-stamp the filename — a handoff
-is current truth that gets overwritten, not an archive.
-Handoffs used to live in the machine's temp directory; two major documents
-nearly vanished from there, and one session's state survived only because
-`dev` happened to be pushed. Nothing load-bearing lives outside the repo.
+Read only:
 
-## Branches and release
+1. `STATE.md` — the single current-state summary.
+2. `modules/index.md` — route to the relevant Vivary module.
+3. The one product, game-design, change, or Relay task linked from `STATE.md`.
 
-`dev` is where all work lands. Branch `feat/*` off `dev` and return through a
-pull request. CI runs the suite on every pull request and every merge.
+Do not preload `tickets.md`, `GAME_ROADMAP.md`, every GDD, old handoffs, archived
+Dorveille state, or sibling worktrees. Git and passing checks outrank prose that
+claims a branch is current.
 
-**`prod` is frozen and is not yours to move.** It holds the publicly deployed
-site, and it advances only when Jeff explicitly decides to make a release live.
-Do not merge, push, fast-forward, or open a pull request into `prod`, and do not
-treat a green suite or a finished ticket as permission to. The site going public
-is a product decision, not a build step.
+## Authority and system boundaries
 
-## Dispatch rules
+- **Vivary/Tropo owns project truth.** Decisions, changes, gates, verification,
+  modules, and `STATE.md` must agree. Run `npm run brain:doctor` before handoff.
+- **Agent Relay owns assignments and receipts.** A Relay task says who does what,
+  with which source material, limits, stop rules, and done evidence. It is not a
+  second product spec or source of project truth.
+- **Game-design documents own player experience.** Platform architecture does
+  not define a game's fun, and a technical design does not replace a GDD.
+- **Git owns code and branch truth.** Never call an uncommitted or unmerged change
+  complete.
+- **Dorveille is optional reflection only.** Invoke it only when Jeff explicitly
+  asks to sleep on, dream-pass, or adversarially reconsider a decision. It does
+  not control sessions, hooks, chips, agents, branches, worktrees, memory, or
+  completion.
 
-Paid for with eight lost agent-runs and a rack built at ten times its cost.
-None of these are optional:
+One fact gets one owner. Link to it elsewhere instead of copying it.
 
-1. **Dispatch subagents synchronously.** Background runs die with the host
-   process and leave nothing behind. If a run is lost, change the dispatch
-   *mechanism* before dispatching again — never re-run the same wave.
-2. **Build to the assigned tier.** `docs/PATH-TO-30.md` assigns every game a
-   tier. Arcade Shorts is the default. Showcase verification — adversarial
-   bot proofs, the full browser playtest matrix — is for headliners only;
-   demanding it of library filler is the single biggest cost mistake this
-   project has made.
-3. **Batch Arcade Shorts.** One agent carries two or three small games per
-   run; one agent per small game is the wrong granularity.
-4. **Agents never edit shared files** (`games/registry.js`, `index.html`,
-   charter docs). They ship a self-contained `games/<slug>/` folder; the
-   orchestrator wires the entry.
-5. **Agents commit and push before they are finished.** A pushed half-game
-   beats an unpushed whole one.
-6. **Deliverables land in the repository, never a temp or scratchpad path.**
-7. **Parallel agents get isolated worktrees.** Two agents sharing one
-   checkout swap HEAD under each other and cross-pollute branches — it
-   happened the first time it was tried. One agent per worktree, always.
+## Development method
 
-## Platform charter
+Use one primary agent by default. Do not create subagents, background agent runs,
+or additional worktrees unless the task contains independently verifiable work
+that genuinely benefits from parallelism and Jeff has asked for it.
 
-Late Shift Arcade is a curated compendium of small, complete, AI-made browser
-games. The deployed eight-game site remains supported as the **Legacy Rack**
-while the platform grows around it. See `SPEC.md` for the product contract,
-`GAME_ROADMAP.md` for the game and release bar, and `tickets.md` for the ordered
-delivery slices.
+Every implementation bet has:
 
-Keep each WAKE block to one named ticket or game deliverable. Do not add lore,
-mascots, or infrastructure outside that slice. A framework, Worker, database,
-auth system, package dependency, or build step enters the repository only when
-an approved ticket requires it. Do not touch anything outside this repository.
+- a fixed appetite in hours or days;
+- one player-visible or operator-visible outcome;
+- variable scope and an explicit cut order;
+- one primary human/browser proof;
+- supporting automated checks;
+- a stop rule.
 
-## Runtime and trust classes
+If the appetite expires, cut scope or stop. Do not silently extend time to satisfy
+an old roadmap or a full future-vision document.
 
-Trust follows code provenance, not rendering technology. These classes have
-different execution privileges even when they satisfy the same versioned game
-contract:
+## Game-development contract
 
-| Class | Execution and trust | Contributor rules |
-| --- | --- | --- |
-| **Shell** | Trusted platform code on the platform origin | Own navigation, catalog presentation, lifecycle, shared input, score presentation, and every identity/storage capability boundary. Keep game-specific rules out of the shell. |
-| **First-party 2D cartridges** | Trusted same-origin vanilla ES modules using the shell-owned canvas | Evolve the current cartridge interface only through a roadmap migration ticket that keeps all eight games runnable through a compatibility adapter. Each launch creates a fresh validated instance; cartridges own no host globals. The Legacy Rack stays zero-dependency and build-free. |
-| **First-party 3D cartridges** | Trusted first-party games delivered as isolated builds | Keep Three.js/WebGL dependencies and build output outside the static shell dependency graph. Communicate through the versioned game contract and dispose runtime, listener, and GPU resources on exit. |
-| **Community cartridges** | Reviewed but untrusted packages served from a separate origin inside a restrictive-CSP sandboxed iframe | Cross the platform seam only through capability-scoped messages in the versioned game contract. Community code never shares the platform origin or receives platform identity, session, credential, or storage privileges. Review permits publication; it does not elevate trust. |
+Before substantial game code, create or update a GDD using
+`game-designs/GDD-TEMPLATE.md`. A GDD must state the player fantasy, verbs,
+core loop, win/loss, controls, session shape, content budget, visual/audio
+direction, onboarding, accessibility, current vertical slice, cut order, and
+playtest questions.
 
-## Shared game rules
+Build the smallest complete playable loop first. The primary gate is a browser
+playtest of that loop. Headless simulation, deterministic replay, performance,
+and unit tests support the experience; they do not substitute for it.
 
-- Keep canonical simulation state in plain, serializable, renderer-independent
-  data. Pure rules advance it; Canvas, DOM, audio, Three.js, and WebGL objects
-  are disposable projections. Keep network and storage adapters outside the
-  simulation.
-- Keep seeded randomness and saveable state outside render objects wherever
-  practical.
-- Support keyboard/pointer and touch for every playable game. Add controller
-  support when it materially improves the game.
-- Action titles must run insanely well (owner bar, 2026-07-25): pool
-  bullets/enemies/particles, no per-frame allocation in hot loops, and ship
-  a headless entity-stress test (hundreds of live entities, bounded step
-  time) alongside the winnable/losable proof.
-- Test pure game logic with `node --test`. N3 replay runs `npm test` plus the
-  verification required by the active ticket.
-- Every new public game must satisfy the canonical **complete-game** and
-  **release-proof** contracts in `GAME_ROADMAP.md`; reference those sections
-  rather than copying a competing checklist here.
+The full DEEPSHIFT document is a future design vision, not a commitment to build
+every section before the arcade can ship. Its active scope is only the bet linked
+from `STATE.md`.
 
-## AI-made disclosure
+## Platform and community submissions
 
-“AI-made” means a disclosed material AI contribution to design, code, art,
-audio, testing, or iteration; human editing is expected and raw prompts are
-not required for publication.
+`product-specs/ARCADE-PLATFORM-PRD.md` owns the platform destination and release
+sequence. The arcade can ship and improve without waiting for DEEPSHIFT or a
+30-game catalog.
 
-## Legacy Rack preservation
+Community code is untrusted. It never runs on the platform origin and never
+receives identity, credentials, platform storage, or privileged shell objects.
+Submission, moderation, publication, and runtime isolation are separate stages;
+accepting a submission does not execute it or publish it.
 
-The shell and current eight first-party 2D cartridges remain a supported
-zero-dependency static site throughout later migrations. `index.html` must run
-from a static file server as-is, with no build step. Preserve their current
-cartridge lifecycle, local scores, keyboard/mouse/touch play, pure-logic tests,
-and GitHub Pages rollback throughout every migration. Retiring that compatibility
-contract requires an explicit charter and deprecation decision, not merely a
-migration ticket.
+## Branches, worktrees, and cleanup
+
+`dev` is the integration branch. Use a short-lived `feat/*` branch for a bounded
+milestone. `prod` is frozen and moves only when Jeff explicitly approves a
+release.
+
+Prefer the main checkout. A temporary worktree is permitted only when a named
+Relay task records its owner, branch, absolute path, source branch, and cleanup
+condition. Unless Jeff explicitly approves a parallel wave, there may be at most
+one non-main worktree.
+
+A worktree task is not done until:
+
+1. useful work is committed and pushed, or explicitly parked with a receipt;
+2. the target branch is integrated or deliberately retained;
+3. the worktree is clean;
+4. `scripts/worktree-closeout.ps1` removes the merged worktree and local branch;
+5. `npm run worktrees:audit` proves what remains and why.
+
+Never remove a dirty, locked, unbanked, unmerged, or main worktree. Never use
+broad filesystem deletion for worktree cleanup.
+
+## Verification and delivery
+
+Plan verification before implementation. At minimum:
+
+- `npm test`
+- the active bet's browser/playtest proof
+- `npm run brain:doctor`
+- `npm run worktrees:audit`
+- `git status --short --branch`
+
+Update `STATE.md`, the owning Vivary artifact, and the Relay receipt. Keep the
+handoff short and point to canonical files. Do not overwrite multiple competing
+"current truth" documents.
