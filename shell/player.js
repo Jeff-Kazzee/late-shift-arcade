@@ -24,7 +24,9 @@ import {
   insertScore,
   qualifies,
   topScore,
+  MAX_SCORE,
 } from './scores.js';
+import { parseDare, formatScore, dareBannerText, shareText } from './share.js';
 import { cartridges } from '../games/registry.js';
 
 const W = 640;
@@ -54,7 +56,7 @@ function compactLabel(value, max = 64) {
 // down — canvas, input listeners, RAF, audio unlock hooks — when the player
 // ejects. Everything it creates, it removes.
 
-function openCabinet(entry, { onClose }) {
+function openCabinet(entry, { onClose, onRunEnd }) {
   const manifest = entry.manifest;
 
   const layer = document.createElement('div');
@@ -247,8 +249,14 @@ function openCabinet(entry, { onClose }) {
         shakeT = 0.25;
       },
       endGame(score) {
-        finished = { score: Math.max(0, Math.round(score)) };
+        const settled = Math.min(MAX_SCORE, Math.max(0, Math.round(score)));
+        // Personal best is judged before this run reaches the table — and
+        // only against a table that has one, so a first-ever score is a
+        // score, not a "best".
+        const prevBest = topScore(loadScores(manifest.slug));
+        finished = { score: settled };
         sincefinish = 0;
+        onRunEnd?.({ score: settled, personalBest: prevBest > 0 && settled > prevBest });
         sfx.play(qualifies(loadScores(manifest.slug), finished.score) ? 'fanfare' : 'lose');
       },
     };
@@ -490,6 +498,102 @@ function renderLocalScores(main, slug) {
   section.hidden = false;
 }
 
+// --- The dare banner ----------------------------------------------------------
+// A dare arrives as `#dare=<int>` on the fragment. parseDare admits a bounded
+// non-negative integer and nothing else; the banner is built from text nodes
+// only, so nothing from the URL can ever become markup here.
+
+function renderDareBanner(main, dare, playButton) {
+  const banner = document.createElement('p');
+  banner.className = 'dare-banner';
+  const label = document.createElement('span');
+  label.className = 'dare-banner-text';
+  label.textContent = dareBannerText(dare);
+  banner.append(label);
+  if (playButton) {
+    const play = document.createElement('button');
+    play.type = 'button';
+    play.className = 'button button-dare';
+    play.textContent = 'Beat it — play now';
+    play.addEventListener('click', () => playButton.click());
+    banner.append(play);
+  }
+  main.prepend(banner);
+}
+
+// --- The share moment -----------------------------------------------------------
+// Appears only when there is a fresh score on the page — after the cabinet
+// closes, never during play, never as a nag. navigator.share where the
+// platform has it; otherwise the artifact goes to the clipboard with a
+// visible confirmation, and if even that is blocked, the text itself is
+// rendered for hand copying.
+
+function renderShareRow(main, { title, url, run, dare }) {
+  const head = main.querySelector('.detail-head') ?? main;
+  let row = head.querySelector('.share-row');
+  if (!row) {
+    row = document.createElement('div');
+    row.className = 'share-row';
+    row.setAttribute('role', 'group');
+    row.setAttribute('aria-label', 'Share your shift');
+    head.append(row);
+  }
+  row.textContent = '';
+  head.querySelector('.share-artifact')?.remove();
+
+  const scoreLabel = document.createElement('span');
+  scoreLabel.className = 'share-score';
+  scoreLabel.textContent = `🌙 ${formatScore(run.score)} on the clock`;
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'button button-share';
+  button.textContent = 'Share your shift';
+
+  const note = document.createElement('span');
+  note.className = 'share-note';
+  note.setAttribute('role', 'status');
+
+  let noteTimer = 0;
+  const setNote = (message) => {
+    clearTimeout(noteTimer);
+    note.textContent = message;
+    noteTimer = setTimeout(() => { note.textContent = ''; }, 6000);
+  };
+
+  const text = shareText({
+    title,
+    score: run.score,
+    url,
+    personalBest: run.personalBest,
+    dare,
+  });
+
+  button.addEventListener('click', async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ text });
+        return;
+      } catch (error) {
+        if (error?.name === 'AbortError') return; // the player changed their mind
+        // fall through to the clipboard
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setNote('copied — paste it anywhere');
+    } catch {
+      const artifact = document.createElement('pre');
+      artifact.className = 'share-artifact';
+      artifact.textContent = text;
+      row.after(artifact);
+      setNote('copy is blocked here — select the text below');
+    }
+  });
+
+  row.append(scoreLabel, button, note);
+}
+
 const main = document.querySelector('main[data-slug]');
 if (main) {
   const slug = main.dataset.slug;
@@ -501,15 +605,36 @@ if (main) {
   // The generator only emits a play button when the launch gate clears the
   // manifest, and entry.load() asks the gate again at launch. This check is
   // belt on top of braces: a page/registry mismatch degrades to a plain page.
-  if (playButton && entry && launchBlockReason(entry.manifest) === null) {
+  const playable = Boolean(playButton && entry && launchBlockReason(entry.manifest) === null);
+
+  // Session-local dare state: parsed once from the fragment, never persisted.
+  const dare = parseDare(window.location.hash);
+  if (dare !== null) renderDareBanner(main, dare, playable ? playButton : null);
+
+  if (playable) {
+    const canonical = document.querySelector('link[rel="canonical"]');
+    const shareUrl = canonical?.href ?? window.location.origin + window.location.pathname;
+    let lastRun = null; // survives cabinet close, dies with the page
+
     playButton.hidden = false;
     playButton.addEventListener('click', () => {
       playButton.disabled = true;
       openCabinet(entry, {
+        onRunEnd(run) {
+          lastRun = run;
+        },
         onClose() {
           playButton.disabled = false;
           playButton.focus();
           renderLocalScores(main, slug);
+          if (lastRun && lastRun.score > 0) {
+            renderShareRow(main, {
+              title: entry.manifest.title,
+              url: shareUrl,
+              run: lastRun,
+              dare,
+            });
+          }
         },
       });
     });
