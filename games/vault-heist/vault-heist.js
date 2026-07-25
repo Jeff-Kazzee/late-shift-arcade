@@ -529,6 +529,12 @@ export function createVaultHeist() {
         ctx.arc(to.x, to.y + 6, 10, 0, Math.PI * 2);
         ctx.stroke();
         text(guard.name[0], from.x, from.y + 10, { size: 10, color: pal.ink, bold: true });
+        // Letter the destination too. With three patrols converging on one
+        // clatter, an unlabelled ring is unreadable — and the whole point is
+        // knowing which of them is about to be standing on you.
+        if (guard.to !== guard.from) {
+          text(guard.name[0], to.x, to.y + 10, { size: 10, color: pal.rose, bold: true });
+        }
 
         // The eye: the one extra room he can see from where he lands.
         if (guard.watches.includes(guard.facing) && guard.facing !== guard.to) {
@@ -552,12 +558,21 @@ export function createVaultHeist() {
       }
     }
 
-    // Crew, and where their queued order puts them.
+    // Crew, and where their queued order puts them. Three people share the
+    // STREET on turn one and often share a room after that, so each gets a
+    // slot within the room rather than being drawn on top of the last.
     const lerp = phase === 'resolve' ? Math.min(1, resolveT / 0.4) : 0;
+    const slotIn = (id, at) => {
+      const here = state.crew.filter((c) => !c.captured && !c.extracted && c.room === id);
+      const seat = here.findIndex((c) => c.id === at);
+      if (seat < 0 || here.length < 2) return 0;
+      return (seat - (here.length - 1) / 2) * 22;
+    };
     for (const crew of state.crew) {
       if (crew.captured || crew.extracted) continue;
       const ink = pal[CREW_INK[crew.id]];
-      let at = roomCentre(crew.room);
+      const centre = roomCentre(crew.room);
+      let at = { x: centre.x + slotIn(crew.room, crew.id), y: centre.y };
       if (phase === 'resolve' && resolved) {
         const move = resolved.moves.find((m) => m.id === crew.id);
         if (move && move.from !== move.to) {
@@ -566,6 +581,9 @@ export function createVaultHeist() {
           at = { x: a.x + (b.x - a.x) * lerp, y: a.y + (b.y - a.y) * lerp };
         }
       }
+      // Guards sit low in the room; crew sit high. Two populations, two rows,
+      // so a pip is never ambiguous about which side it is on.
+      at = { x: at.x, y: at.y - 4 };
       const order = orders[crew.id];
       if (phase === 'plan' && order && order.kind === 'move') {
         const dest = roomCentre(order.to);
@@ -603,7 +621,11 @@ export function createVaultHeist() {
         ctx.fillRect(at.x + 8, at.y - 18, 7, 7);
       }
       if (caught || seen) {
-        text(caught ? 'SEEN' : 'LENS', at.x, at.y + 16, {
+        // Stagger the warning by seat, or two people in one room print their
+        // labels on top of each other and neither is legible.
+        const seat = state.crew.filter((c) => !c.captured && !c.extracted && c.room === crew.room)
+          .findIndex((c) => c.id === crew.id);
+        text(caught ? 'SEEN' : 'LENS', at.x, at.y + 16 + Math.max(0, seat) * 10, {
           size: 9, color: pal.rose, bold: true,
         });
       }
@@ -632,19 +654,24 @@ export function createVaultHeist() {
       size: 12, color: camerasLive(state) ? pal.deep : tint(pal.cream, 0.55), bold: true,
     });
 
+    // The cabinet's eject button floats over the top-right of the glass, and
+    // it is not a fixed size: about 32 canvas units square on a desktop but 66
+    // on a landscape handset, where it swallowed this whole column. Both rows
+    // stop well clear of the widest case rather than of the one being looked at.
+    const RIGHT = W - 92;
     if (state.alarms > 0) {
       const urgent = state.lockdown >= 0 && state.lockdown <= 3;
-      text(`ALARM x${state.alarms}`, W - 14, 24, {
+      text(`ALARM x${state.alarms}`, RIGHT, 24, {
         align: 'right', size: 13, color: pal.rose, bold: true, glow: urgent ? 9 : 0,
       });
       if (state.lockdown >= 0) {
-        text(`LOCKDOWN ${state.lockdown}`, W - 14, 44, {
+        text(`LOCKDOWN ${state.lockdown}`, RIGHT, 44, {
           align: 'right', size: 13, color: urgent ? pal.rose : pal.amber, bold: true,
         });
       }
     } else {
-      text('QUIET', W - 14, 24, { align: 'right', size: 13, color: pal.periwinkle, bold: true });
-      text(`OBJ ${b.objectives}/2`, W - 14, 44, { align: 'right', size: 12, color: pal.amber });
+      text('QUIET', RIGHT, 24, { align: 'right', size: 13, color: pal.periwinkle, bold: true });
+      text(`OBJ ${b.objectives}/2`, RIGHT, 44, { align: 'right', size: 12, color: pal.amber });
     }
 
     // The one line that says whether the turn you have queued is survivable.
@@ -703,14 +730,18 @@ export function createVaultHeist() {
   }
 
   function drawResult(ctx, text, pal) {
-    ctx.fillStyle = tint(pal.ink, 0.86);
+    ctx.fillStyle = tint(pal.ink, 0.95);
     ctx.fillRect(0, 0, W, H);
     const won = state.outcome === 'win';
     const b = scoreBreakdown(state);
     text(won ? 'CLEAN AWAY' : 'THE JOB IS BLOWN', W / 2, 132, {
       size: 30, color: won ? pal.amber : pal.rose, bold: true, glow: 12,
     });
-    text(state.reason, W / 2, 164, { size: 13, color: pal.cream });
+    // On a win the reason IS the headline, so show the seed instead — it is
+    // the thing worth carrying away and running again.
+    text(won ? `VAULT ${state.seed} IN ${state.turn} TURNS` : state.reason, W / 2, 164, {
+      size: 13, color: pal.cream,
+    });
     const rows = [
       [`TAKE ${b.lootValue.toLocaleString()}`, `${b.loot.toLocaleString()}`],
       [`CREW OUT ${b.survivors}`, `${b.crew.toLocaleString()}`],

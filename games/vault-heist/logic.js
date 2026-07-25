@@ -339,8 +339,14 @@ export function reachable(state, crew) {
 // player taps and the effect the turn applies can never disagree.
 export function actionAt(state, crew) {
   const here = room(crew.room);
-  if (here.console === 'cameras' && crew.can.hack) return { kind: 'hack-cameras' };
-  if (here.console === 'lights' && crew.can.hack) return { kind: 'hack-lights' };
+  // A console already dealt with is not an action. Offering it again would
+  // put a button on the cabinet that spends a turn and changes nothing.
+  if (here.console === 'cameras' && crew.can.hack && !state.camerasDead) {
+    return { kind: 'hack-cameras' };
+  }
+  if (here.console === 'lights' && crew.can.hack && state.lightsOutTurns <= 0) {
+    return { kind: 'hack-lights' };
+  }
   const spoils = lootInRoom(state, crew.room);
   if (spoils.length > 0 && carriedBy(state, crew.id).length < crew.capacity) {
     return { kind: 'grab', loot: spoils[0].id };
@@ -755,6 +761,10 @@ export function resolveTurn(state, orders = {}) {
 // The formula on the cabinet card, and nothing else. A failed heist scores
 // zero: the shared score contract puts completed runs ahead of failed ones, so
 // a lockdown that traps two people cannot outrank a clean getaway.
+// JavaScript will happily hand you -0 for `-2000 * 0`, and the cabinet then
+// prints "ALARMS 0   -0" on the result card. Normalise at the source.
+const zeroless = (n) => (n === 0 ? 0 : n);
+
 export function scoreBreakdown(state) {
   const lootValue = state.loot
     .filter((l) => l.extracted)
@@ -773,9 +783,9 @@ export function scoreBreakdown(state) {
     unusedTools,
     toolBonus: CFG.SCORE_PER_UNUSED_TOOL * unusedTools,
     turns: state.turn,
-    turnCost: CFG.SCORE_PER_TURN * state.turn,
+    turnCost: zeroless(CFG.SCORE_PER_TURN * state.turn),
     alarms: state.alarms,
-    alarmCost: CFG.SCORE_PER_ALARM * state.alarms,
+    alarmCost: zeroless(CFG.SCORE_PER_ALARM * state.alarms),
   };
 }
 
