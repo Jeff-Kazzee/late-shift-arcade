@@ -1,9 +1,12 @@
-# DEEPSHIFT — DS-1a kernel slice
+# DEEPSHIFT — DS-1a kernel + DS-1b stress slices
 
-The first engineering slice of the DEEPSHIFT voxel game (DS-0 D4). A pure,
-deterministic, headless sim kernel; an eight-minute graybox proven winnable
-and losable by scripted policies; a Three.js renderer behind the cartridge
-boundary; and a headless verifier that replays any run byte-identically.
+The first engineering slices of the DEEPSHIFT voxel game (DS-0 D4). DS-1a:
+a pure, deterministic, headless sim kernel; an eight-minute graybox proven
+winnable and losable by scripted policies; a Three.js renderer behind the
+cartridge boundary; and a headless verifier that replays any run
+byte-identically. DS-1b: worker meshing behind the F-06 snapshot contract,
+radius-8 desktop render streaming, adversarial stress scenes with an edit
+churn harness, and MEASURED §13.5 desktop numbers (`PERF.md`).
 Binding decisions: `docs/DS-0-DECISIONS.md`; architecture: GDD §13.
 
 ## Layout
@@ -17,14 +20,41 @@ sim/       pure kernel. Imports NOTHING outside sim/ (test-enforced).
   physics.js     20 Hz fixed-step AABB voxel physics
   sim.js         state, rules, tick, per-tick hash chain, WorldView snapshot
   replay.js      headless replay + run-log envelope
-view/      renderer side. mesher.js and registry.js are pure (tested headless);
-           renderer.js is the Three.js subscriber — holds zero sim truth.
+view/      renderer side. Pure and headless-tested: mesher.js, registry.js,
+           mesh-snapshot.js (F-06 immutable section+halo job snapshots),
+           mesh-pool.js (revision-stamped scheduler: stale rejection,
+           coalescing, counted+capped buffers), render-set.js (radius-8
+           spiral streaming, radius+2 unload), stress-scenes.js + churn.js
+           (DS-1b adversarial fixtures). Browser-side: mesh-worker.js (plain
+           module worker), mesh-transports.js (2-4 workers, inline fallback),
+           renderer.js — the Three.js subscriber, streams sections through
+           the pool and draws one merged geometry per 32^3 chunk.
 cart/      the F-008 cartridge adapter: lifecycle, input (KB/M + touch), DOM HUD.
 vendor/    three 0.185.1 (module + core, minified ES modules) + MIT license.
 tools/     verify-run.mjs (the DS-1a acceptance verifier), scripted policies,
-           fixture regenerators.
+           fixture regenerators, serve.mjs (dev static server for stress runs).
 fixtures/  d1-activation.json (D1 conformance golden), golden-run.json.
+stress.html      DS-1b measurement harness (window.__stress()).
+PERF.md          measured §13.5 desktop numbers + methodology + misses.
+perf-evidence/   screenshots behind PERF.md.
 ```
+
+## DS-1b in one paragraph
+
+Meshing runs in 2-4 plain module workers. Every job is an immutable
+snapshot of one 16^3 section plus a one-voxel halo, stamped with the
+section's revision; results carry the revision back and are rejected if
+stale — at receive time and again at apply time. Superseded queued jobs
+coalesce; in-flight input bytes, pending output bytes, and job counts are
+capped with real backpressure (dispatch stalls, never the sim). The
+renderer streams chunk columns in spiral order to radius 8 around the
+camera (device-local presentation only — D1 activation stays radius 3, a
+ruleset constant; frozen-but-visible chunks are the normal case), unloads
+beyond radius+2, and draws one merged geometry per 32^3 chunk so draw
+calls stay ~100-250 against the 600 budget. Correctness under churn is
+proven headless: scripted boundary-biased edit bursts against two
+out-of-order transports must leave every touched section byte-identical
+to a fresh remesh of the final world.
 
 No build step, no bundler: everything runs from a static file server; the
 repo root stays zero-dependency. Vendored three: 752 KB raw, ~188 KB gzip
@@ -135,6 +165,11 @@ is a **ruleset event**: goldens change only when the rules deliberately do.
 ## Tests
 
 `npm test` at the repo root discovers `games/deepshift/*.test.js` like every
-other game. 59 tests: math/hash vectors, chunk/worldgen/world, D1
-conformance (golden fixture), physics, purity scans, replay + verifier CLI,
-graybox win/loss policies, mesher + WorldView seam, cartridge contract.
+other game. 93 tests: math/hash vectors, chunk/worldgen/world, D1
+conformance (golden fixture), physics, purity scans (now including the
+worker import-graph: sim/ can never reference Worker/postMessage or the
+mesh pipeline), replay + verifier CLI, graybox win/loss policies, mesher +
+WorldView seam, cartridge contract, and the DS-1b set — mesh-job snapshot
+immutability/byte-identity, pool stale-rejection/coalescing/caps,
+render-set spiral/unload, stress-scene determinism, and remesh-under-churn
+correctness.

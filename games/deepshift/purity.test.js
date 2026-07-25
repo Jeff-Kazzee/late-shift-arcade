@@ -34,6 +34,11 @@ const BANNED = [
   [/\bsetTimeout\b|\bsetInterval\b|\brequestAnimationFrame\b/, 'scheduler access'],
   [/\brequire\s*\(/, 'CommonJS require'],
   [/\bfetch\s*\(/, 'network access'],
+  // DS-1b: meshing moved to workers — worker plumbing is view-side
+  // presentation and may never leak into the deterministic sim.
+  [/\bWorker\b/, 'worker construction (presentation-side only)'],
+  [/\bpostMessage\b|\bonmessage\b/, 'worker messaging (presentation-side only)'],
+  [/\bSharedArrayBuffer\b/, 'shared memory (presentation-side only)'],
 ];
 
 test('sim/ contains no randomness, clocks, browser globals, or libm', () => {
@@ -62,6 +67,36 @@ test('sim/ imports only sim/ — no three, no view/, no bare or builtin specifie
       assert.ok(!spec.split('/').includes('..') || !spec.includes('/view'),
         `${file} escapes sim/ toward view/: ${spec}`);
     }
+  }
+});
+
+test('sim/ never references the mesh worker pipeline by name', () => {
+  // Belt and braces over the import scan: the worker files themselves must
+  // be unreachable from sim/ even via computed specifiers.
+  for (const file of simFiles()) {
+    const source = readFileSync(file, 'utf8');
+    assert.ok(!/mesh-worker|mesh-pool|mesh-snapshot|mesh-transports|render-set/.test(source),
+      `${file} references worker/render-set code`);
+  }
+});
+
+test('the mesh worker chain stays dependency-free: no three, no vendor, no sim, no DOM', () => {
+  // The worker must remain a plain ES module over pure geometry code so it
+  // loads fast, transfers cleanly, and can never smuggle sim truth.
+  const chain = ['mesh-worker.js', 'mesh-snapshot.js', 'mesh-pool.js', 'mesher.js'];
+  const importRe = /(?:import|from)\s+['"]([^'"]+)['"]/g;
+  for (const name of chain) {
+    const file = fileURLToPath(new URL(`./view/${name}`, import.meta.url));
+    const source = readFileSync(file, 'utf8');
+    for (const match of source.matchAll(importRe)) {
+      const spec = match[1];
+      assert.ok(spec.startsWith('./'), `${name} imports non-local specifier: ${spec}`);
+      assert.ok(!/(^|\/)three(\.|\/|$)/.test(spec) && !spec.includes('vendor') && !spec.includes('sim'),
+        `${name} imports outside the pure mesh chain: ${spec}`);
+      const target = spec.replace('./', '');
+      assert.ok(chain.includes(target), `${name} imports ${spec}, outside the audited chain`);
+    }
+    assert.ok(!/\bdocument\b|\bwindow\b/.test(source), `${name} touches the DOM`);
   }
 });
 
