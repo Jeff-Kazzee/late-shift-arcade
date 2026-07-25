@@ -45,6 +45,20 @@ export function clamp(v, lo, hi) {
   return v < lo ? lo : v > hi ? hi : v;
 }
 
+// Integer floor square root. Math.sqrt is IEEE-754-exact for doubles (GDD
+// §5.2 allows + - x / sqrt) but its float result can land either side of an
+// integer boundary after flooring, so it only SEEDS the answer; the
+// correction loop below makes the result exactly floor(sqrt(n)) on every
+// engine. n must be a non-negative safe integer.
+export function isqrt(n) {
+  if (n < 0) throw new Error(`isqrt of negative: ${n}`);
+  if (n === 0) return 0;
+  let r = Math.floor(Math.sqrt(n));
+  while (r * r > n) r -= 1;
+  while ((r + 1) * (r + 1) <= n) r += 1;
+  return r;
+}
+
 // Integer Chebyshev distance on any integer lattice (D1: the activation
 // metric on the chunk lattice). Pure integers, no floats, no libm.
 export function chebyshev3(ax, ay, az, bx, by, bz) {

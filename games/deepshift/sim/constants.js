@@ -60,7 +60,7 @@ export const RULESET = Object.freeze({
   copperMaxY: 80,
   outcropCellSize: 16, // surface outcrops per 16x16 lattice cell (§5.2's
   outcropChance: 2, // "quota ore within reach" guarantee, 1-in-2 cells)
-  treeChance: 48, // 1-in-48 columns roots a gnarlpine (scattered, §5.4)
+  treeCellChance: 3, // 1-in-3 8x8 cells root a gnarlpine (scattered, §5.4)
   sandPatchChance: 6, // 1-in-6 16x16 cells carry a sand patch
   gravelPatchChance: 12,
 
