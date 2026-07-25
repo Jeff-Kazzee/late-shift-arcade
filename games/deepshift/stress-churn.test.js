@@ -94,7 +94,7 @@ test('caves scene: the seed matters and caves carve real voids underground', () 
 
 test('fortress walls sit on section boundaries and span them', () => {
   const scene = fortressScene();
-  // x = 304 is both a wall plane ((304-280)%8 == 0) and a section boundary.
+  // x = 304 is both a wall plane ((304-160)%8 == 0) and a section boundary.
   assert.equal(304 % SECTION, 0);
   assert.equal(scene.readBlock(304, 41, 300), 'wardwall');
   // The wall continues across the z-section boundary at z = 304 too.

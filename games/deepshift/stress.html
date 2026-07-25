@@ -222,7 +222,6 @@
       canvas?.remove();
       canvas = null;
       $('[data-stop]').disabled = true;
-      $('[data-start]').disabled = false;
     }
 
     function start() {
@@ -242,7 +241,6 @@
       statsSince = startedAt;
       raf = requestAnimationFrame(frame);
       $('[data-stop]').disabled = false;
-      $('[data-start]').disabled = true;
     }
 
     $('[data-start]').addEventListener('click', start);

@@ -224,18 +224,18 @@ export function cavesScene(seedHex = '00000000deadbeef') {
 // hits 288, 304, 320...), floors slice every 8 blocks vertically, windows
 // punch holes so nothing merges wide — the face-ownership stress case.
 export function fortressScene() {
-  const IN = (v) => v >= 280 && v < 360;
+  const IN = (v) => v >= 160 && v < 480; // a 320x320-block built city
   const base = (x, y, z) => {
     if (y < 0) return 'worldbone';
     if (y < 37) return 'fieldstone';
     if (y < 40) return 'dirt';
     if (y < 80 && IN(x) && IN(z)) {
       const fy = (y - 40) % 8;
-      const wallX = ((x - 280) % 8) === 0;
-      const wallZ = ((z - 280) % 8) === 0;
+      const wallX = ((x - 160) % 8) === 0;
+      const wallZ = ((z - 160) % 8) === 0;
       if (fy === 0) {
         // Floor slab with a stairwell hole per 32-block bay.
-        if (((x - 280) % 32) < 2 && ((z - 280) % 32) < 2) return 'air';
+        if (((x - 160) % 32) < 2 && ((z - 160) % 32) < 2) return 'air';
         return 'wardwall';
       }
       if (wallX || wallZ) {
@@ -243,7 +243,7 @@ export function fortressScene() {
         if ((fy === 3 || fy === 4) && ((x + z) % 8) >= 2 && ((x + z) % 8) <= 5) return 'air';
         return 'wardwall';
       }
-      if (((x - 280) % 8) === 4 && ((z - 280) % 8) === 4) return 'cache'; // pillar
+      if (((x - 160) % 8) === 4 && ((z - 160) % 8) === 4) return 'cache'; // pillar
       return 'air';
     }
     return 'air';
@@ -254,7 +254,7 @@ export function fortressScene() {
     if (sy >= 5) return 'air'; // y >= 80 above the fortress
     const x0 = sx * SECTION;
     const z0 = sz * SECTION;
-    const touches = x0 < 360 && x0 + SECTION > 280 && z0 < 360 && z0 + SECTION > 280;
+    const touches = x0 < 480 && x0 + SECTION > 160 && z0 < 480 && z0 + SECTION > 160;
     if (sy === 2) return null; // ground surface band
     return touches ? null : 'air'; // sy 3..4: air unless inside the build
   };
@@ -262,7 +262,7 @@ export function fortressScene() {
     name: 'fortress',
     base,
     baseUniform,
-    anchor: { x: 320.5, y: 60, z: 244.5 },
+    anchor: { x: 320.5, y: 66, z: 320.5 },
     seedHex: null,
   });
 }
