@@ -19,6 +19,7 @@ import { manifest as galaxyRaid } from './galaxy-raid/manifest.js';
 import { manifest as neonSnake } from './neon-snake/manifest.js';
 import { manifest as lunarDescent } from './lunar-descent/manifest.js';
 import { manifest as midnightRun } from './midnight-run/manifest.js';
+import { manifest as vaultHeist } from './vault-heist/manifest.js';
 import { manifest as pinballAfterDark } from './pinball-after-dark/manifest.js';
 import { manifest as railSwitch } from './rail-switch/manifest.js';
 import { manifest as orbitalSalvage } from './orbital-salvage/manifest.js';
@@ -47,4 +48,5 @@ export const cartridges = validateCatalog([
     orbitalSalvage,
     lazyModule('./orbital-salvage/orbital-salvage.js', import.meta.url),
   ),
+  defineCatalogEntry(vaultHeist, lazyModule('./vault-heist/vault-heist.js', import.meta.url)),
 ]);
